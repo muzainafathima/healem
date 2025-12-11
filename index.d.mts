@@ -1,2658 +1,2945 @@
-import { ActionCreator, Action, Middleware, StoreEnhancer, UnknownAction, Reducer, ReducersMapObject, Store, Dispatch, StateFromReducersMapObject, MiddlewareAPI } from 'redux';
-export * from 'redux';
-import { Draft } from 'immer';
-export { Draft, WritableDraft, produce as createNextState, current, freeze, isDraft, original } from 'immer';
-import * as reselect from 'reselect';
-import { weakMapMemoize, createSelectorCreator, Selector, CreateSelectorFunction } from 'reselect';
-export { OutputSelector, Selector, createSelector, createSelectorCreator, lruMemoize, weakMapMemoize } from 'reselect';
-import { ThunkMiddleware, ThunkDispatch } from 'redux-thunk';
-export { ThunkAction, ThunkDispatch, ThunkMiddleware } from 'redux-thunk';
-import { UncheckedIndexedAccess } from './uncheckedindexed.js';
+import * as _reduxjs_toolkit from '@reduxjs/toolkit';
+import { ThunkDispatch, UnknownAction, Draft, AsyncThunk, SHOULD_AUTOBATCH, ThunkAction, SafePromise, SerializedError, PayloadAction, ActionCreatorWithoutPayload, Reducer, Middleware, ActionCreatorWithPayload, createSelector } from '@reduxjs/toolkit';
+import { Patch } from 'immer';
+import * as redux from 'redux';
+import { StandardSchemaV1 } from '@standard-schema/spec';
+import { SchemaError } from '@standard-schema/utils';
 
-declare const createDraftSafeSelectorCreator: typeof createSelectorCreator;
-/**
- * "Draft-Safe" version of `reselect`'s `createSelector`:
- * If an `immer`-drafted object is passed into the resulting selector's first argument,
- * the selector will act on the current draft value, instead of returning a cached value
- * that might be possibly outdated if the draft has been modified since.
- * @public
- */
-declare const createDraftSafeSelector: reselect.CreateSelectorFunction<typeof weakMapMemoize, typeof weakMapMemoize, any>;
-
-/**
- * @public
- */
-interface DevToolsEnhancerOptions {
-    /**
-     * the instance name to be showed on the monitor page. Default value is `document.title`.
-     * If not specified and there's no document title, it will consist of `tabId` and `instanceId`.
-     */
-    name?: string;
-    /**
-     * action creators functions to be available in the Dispatcher.
-     */
-    actionCreators?: ActionCreator<any>[] | {
-        [key: string]: ActionCreator<any>;
-    };
-    /**
-     * if more than one action is dispatched in the indicated interval, all new actions will be collected and sent at once.
-     * It is the joint between performance and speed. When set to `0`, all actions will be sent instantly.
-     * Set it to a higher value when experiencing perf issues (also `maxAge` to a lower value).
-     *
-     * @default 500 ms.
-     */
-    latency?: number;
-    /**
-     * (> 1) - maximum allowed actions to be stored in the history tree. The oldest actions are removed once maxAge is reached. It's critical for performance.
-     *
-     * @default 50
-     */
-    maxAge?: number;
-    /**
-     * Customizes how actions and state are serialized and deserialized. Can be a boolean or object. If given a boolean, the behavior is the same as if you
-     * were to pass an object and specify `options` as a boolean. Giving an object allows fine-grained customization using the `replacer` and `reviver`
-     * functions.
-     */
-    serialize?: boolean | {
-        /**
-         * - `undefined` - will use regular `JSON.stringify` to send data (it's the fast mode).
-         * - `false` - will handle also circular references.
-         * - `true` - will handle also date, regex, undefined, error objects, symbols, maps, sets and functions.
-         * - object, which contains `date`, `regex`, `undefined`, `error`, `symbol`, `map`, `set` and `function` keys.
-         *   For each of them you can indicate if to include (by setting as `true`).
-         *   For `function` key you can also specify a custom function which handles serialization.
-         *   See [`jsan`](https://github.com/kolodny/jsan) for more details.
-         */
-        options?: undefined | boolean | {
-            date?: true;
-            regex?: true;
-            undefined?: true;
-            error?: true;
-            symbol?: true;
-            map?: true;
-            set?: true;
-            function?: true | ((fn: (...args: any[]) => any) => string);
-        };
-        /**
-         * [JSON replacer function](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#The_replacer_parameter) used for both actions and states stringify.
-         * In addition, you can specify a data type by adding a [`__serializedType__`](https://github.com/zalmoxisus/remotedev-serialize/blob/master/helpers/index.js#L4)
-         * key. So you can deserialize it back while importing or persisting data.
-         * Moreover, it will also [show a nice preview showing the provided custom type](https://cloud.githubusercontent.com/assets/7957859/21814330/a17d556a-d761-11e6-85ef-159dd12f36c5.png):
-         */
-        replacer?: (key: string, value: unknown) => any;
-        /**
-         * [JSON `reviver` function](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#Using_the_reviver_parameter)
-         * used for parsing the imported actions and states. See [`remotedev-serialize`](https://github.com/zalmoxisus/remotedev-serialize/blob/master/immutable/serialize.js#L8-L41)
-         * as an example on how to serialize special data types and get them back.
-         */
-        reviver?: (key: string, value: unknown) => any;
-        /**
-         * Automatically serialize/deserialize immutablejs via [remotedev-serialize](https://github.com/zalmoxisus/remotedev-serialize).
-         * Just pass the Immutable library. It will support all ImmutableJS structures. You can even export them into a file and get them back.
-         * The only exception is `Record` class, for which you should pass this in addition the references to your classes in `refs`.
-         */
-        immutable?: any;
-        /**
-         * ImmutableJS `Record` classes used to make possible restore its instances back when importing, persisting...
-         */
-        refs?: any;
-    };
-    /**
-     * function which takes `action` object and id number as arguments, and should return `action` object back.
-     */
-    actionSanitizer?: <A extends Action>(action: A, id: number) => A;
-    /**
-     * function which takes `state` object and index as arguments, and should return `state` object back.
-     */
-    stateSanitizer?: <S>(state: S, index: number) => S;
-    /**
-     * *string or array of strings as regex* - actions types to be hidden / shown in the monitors (while passed to the reducers).
-     * If `actionsAllowlist` specified, `actionsDenylist` is ignored.
-     */
-    actionsDenylist?: string | string[];
-    /**
-     * *string or array of strings as regex* - actions types to be hidden / shown in the monitors (while passed to the reducers).
-     * If `actionsAllowlist` specified, `actionsDenylist` is ignored.
-     */
-    actionsAllowlist?: string | string[];
-    /**
-     * called for every action before sending, takes `state` and `action` object, and returns `true` in case it allows sending the current data to the monitor.
-     * Use it as a more advanced version of `actionsDenylist`/`actionsAllowlist` parameters.
-     */
-    predicate?: <S, A extends Action>(state: S, action: A) => boolean;
-    /**
-     * if specified as `false`, it will not record the changes till clicking on `Start recording` button.
-     * Available only for Redux enhancer, for others use `autoPause`.
-     *
-     * @default true
-     */
-    shouldRecordChanges?: boolean;
-    /**
-     * if specified, whenever clicking on `Pause recording` button and there are actions in the history log, will add this action type.
-     * If not specified, will commit when paused. Available only for Redux enhancer.
-     *
-     * @default "@@PAUSED""
-     */
-    pauseActionType?: string;
-    /**
-     * auto pauses when the extension’s window is not opened, and so has zero impact on your app when not in use.
-     * Not available for Redux enhancer (as it already does it but storing the data to be sent).
-     *
-     * @default false
-     */
-    autoPause?: boolean;
-    /**
-     * if specified as `true`, it will not allow any non-monitor actions to be dispatched till clicking on `Unlock changes` button.
-     * Available only for Redux enhancer.
-     *
-     * @default false
-     */
-    shouldStartLocked?: boolean;
-    /**
-     * if set to `false`, will not recompute the states on hot reloading (or on replacing the reducers). Available only for Redux enhancer.
-     *
-     * @default true
-     */
-    shouldHotReload?: boolean;
-    /**
-     * if specified as `true`, whenever there's an exception in reducers, the monitors will show the error message, and next actions will not be dispatched.
-     *
-     * @default false
-     */
-    shouldCatchErrors?: boolean;
-    /**
-     * If you want to restrict the extension, specify the features you allow.
-     * If not specified, all of the features are enabled. When set as an object, only those included as `true` will be allowed.
-     * Note that except `true`/`false`, `import` and `export` can be set as `custom` (which is by default for Redux enhancer), meaning that the importing/exporting occurs on the client side.
-     * Otherwise, you'll get/set the data right from the monitor part.
-     */
-    features?: {
-        /**
-         * start/pause recording of dispatched actions
-         */
-        pause?: boolean;
-        /**
-         * lock/unlock dispatching actions and side effects
-         */
-        lock?: boolean;
-        /**
-         * persist states on page reloading
-         */
-        persist?: boolean;
-        /**
-         * export history of actions in a file
-         */
-        export?: boolean | 'custom';
-        /**
-         * import history of actions from a file
-         */
-        import?: boolean | 'custom';
-        /**
-         * jump back and forth (time travelling)
-         */
-        jump?: boolean;
-        /**
-         * skip (cancel) actions
-         */
-        skip?: boolean;
-        /**
-         * drag and drop actions in the history list
-         */
-        reorder?: boolean;
-        /**
-         * dispatch custom actions or action creators
-         */
-        dispatch?: boolean;
-        /**
-         * generate tests for the selected actions
-         */
-        test?: boolean;
-    };
-    /**
-     * Set to true or a stacktrace-returning function to record call stack traces for dispatched actions.
-     * Defaults to false.
-     */
-    trace?: boolean | (<A extends Action>(action: A) => string);
-    /**
-     * The maximum number of stack trace entries to record per action. Defaults to 10.
-     */
-    traceLimit?: number;
-}
-
-interface ActionCreatorInvariantMiddlewareOptions {
-    /**
-     * The function to identify whether a value is an action creator.
-     * The default checks for a function with a static type property and match method.
-     */
-    isActionCreator?: (action: unknown) => action is Function & {
-        type?: unknown;
-    };
-}
-declare function createActionCreatorInvariantMiddleware(options?: ActionCreatorInvariantMiddlewareOptions): Middleware;
-
-/**
- * Returns true if the passed value is "plain", i.e. a value that is either
- * directly JSON-serializable (boolean, number, string, array, plain object)
- * or `undefined`.
- *
- * @param val The value to check.
- *
- * @public
- */
-declare function isPlain(val: any): boolean;
-interface NonSerializableValue {
-    keyPath: string;
-    value: unknown;
-}
-type IgnorePaths = readonly (string | RegExp)[];
-/**
- * @public
- */
-declare function findNonSerializableValue(value: unknown, path?: string, isSerializable?: (value: unknown) => boolean, getEntries?: (value: unknown) => [string, any][], ignoredPaths?: IgnorePaths, cache?: WeakSet<object>): NonSerializableValue | false;
-/**
- * Options for `createSerializableStateInvariantMiddleware()`.
- *
- * @public
- */
-interface SerializableStateInvariantMiddlewareOptions {
-    /**
-     * The function to check if a value is considered serializable. This
-     * function is applied recursively to every value contained in the
-     * state. Defaults to `isPlain()`.
-     */
-    isSerializable?: (value: any) => boolean;
-    /**
-     * The function that will be used to retrieve entries from each
-     * value.  If unspecified, `Object.entries` will be used. Defaults
-     * to `undefined`.
-     */
-    getEntries?: (value: any) => [string, any][];
-    /**
-     * An array of action types to ignore when checking for serializability.
-     * Defaults to []
-     */
-    ignoredActions?: string[];
-    /**
-     * An array of dot-separated path strings or regular expressions to ignore
-     * when checking for serializability, Defaults to
-     * ['meta.arg', 'meta.baseQueryMeta']
-     */
-    ignoredActionPaths?: (string | RegExp)[];
-    /**
-     * An array of dot-separated path strings or regular expressions to ignore
-     * when checking for serializability, Defaults to []
-     */
-    ignoredPaths?: (string | RegExp)[];
-    /**
-     * Execution time warning threshold. If the middleware takes longer
-     * than `warnAfter` ms, a warning will be displayed in the console.
-     * Defaults to 32ms.
-     */
-    warnAfter?: number;
-    /**
-     * Opt out of checking state. When set to `true`, other state-related params will be ignored.
-     */
-    ignoreState?: boolean;
-    /**
-     * Opt out of checking actions. When set to `true`, other action-related params will be ignored.
-     */
-    ignoreActions?: boolean;
-    /**
-     * Opt out of caching the results. The cache uses a WeakSet and speeds up repeated checking processes.
-     * The cache is automatically disabled if no browser support for WeakSet is present.
-     */
-    disableCache?: boolean;
-}
-/**
- * Creates a middleware that, after every state change, checks if the new
- * state is serializable. If a non-serializable value is found within the
- * state, an error is printed to the console.
- *
- * @param options Middleware options.
- *
- * @public
- */
-declare function createSerializableStateInvariantMiddleware(options?: SerializableStateInvariantMiddlewareOptions): Middleware;
-
-/**
- * The default `isImmutable` function.
- *
- * @public
- */
-declare function isImmutableDefault(value: unknown): boolean;
-type IsImmutableFunc = (value: any) => boolean;
-/**
- * Options for `createImmutableStateInvariantMiddleware()`.
- *
- * @public
- */
-interface ImmutableStateInvariantMiddlewareOptions {
-    /**
-      Callback function to check if a value is considered to be immutable.
-      This function is applied recursively to every value contained in the state.
-      The default implementation will return true for primitive types
-      (like numbers, strings, booleans, null and undefined).
-     */
-    isImmutable?: IsImmutableFunc;
-    /**
-      An array of dot-separated path strings that match named nodes from
-      the root state to ignore when checking for immutability.
-      Defaults to undefined
-     */
-    ignoredPaths?: IgnorePaths;
-    /** Print a warning if checks take longer than N ms. Default: 32ms */
-    warnAfter?: number;
-}
-/**
- * Creates a middleware that checks whether any state was mutated in between
- * dispatches or during a dispatch. If any mutations are detected, an error is
- * thrown.
- *
- * @param options Middleware options.
- *
- * @public
- */
-declare function createImmutableStateInvariantMiddleware(options?: ImmutableStateInvariantMiddlewareOptions): Middleware;
-
-declare class Tuple<Items extends ReadonlyArray<unknown> = []> extends Array<Items[number]> {
-    constructor(length: number);
-    constructor(...items: Items);
-    static get [Symbol.species](): any;
-    concat<AdditionalItems extends ReadonlyArray<unknown>>(items: Tuple<AdditionalItems>): Tuple<[...Items, ...AdditionalItems]>;
-    concat<AdditionalItems extends ReadonlyArray<unknown>>(items: AdditionalItems): Tuple<[...Items, ...AdditionalItems]>;
-    concat<AdditionalItems extends ReadonlyArray<unknown>>(...items: AdditionalItems): Tuple<[...Items, ...AdditionalItems]>;
-    prepend<AdditionalItems extends ReadonlyArray<unknown>>(items: Tuple<AdditionalItems>): Tuple<[...AdditionalItems, ...Items]>;
-    prepend<AdditionalItems extends ReadonlyArray<unknown>>(items: AdditionalItems): Tuple<[...AdditionalItems, ...Items]>;
-    prepend<AdditionalItems extends ReadonlyArray<unknown>>(...items: AdditionalItems): Tuple<[...AdditionalItems, ...Items]>;
-}
-
-/**
- * return True if T is `any`, otherwise return False
- * taken from https://github.com/joonhocho/tsdef
- *
- * @internal
- */
-type IsAny<T, True, False = never> = true | false extends (T extends never ? true : false) ? True : False;
-type CastAny<T, CastTo> = IsAny<T, CastTo, T>;
-/**
- * return True if T is `unknown`, otherwise return False
- * taken from https://github.com/joonhocho/tsdef
- *
- * @internal
- */
-type IsUnknown<T, True, False = never> = unknown extends T ? IsAny<T, False, True> : False;
-type FallbackIfUnknown<T, Fallback> = IsUnknown<T, Fallback, T>;
-/**
- * @internal
- */
-type IfMaybeUndefined<P, True, False> = [undefined] extends [P] ? True : False;
-/**
- * @internal
- */
-type IfVoid<P, True, False> = [void] extends [P] ? True : False;
-/**
- * @internal
- */
-type IsEmptyObj<T, True, False = never> = T extends any ? keyof T extends never ? IsUnknown<T, False, IfMaybeUndefined<T, False, IfVoid<T, False, True>>> : False : never;
-/**
- * returns True if TS version is above 3.5, False if below.
- * uses feature detection to detect TS version >= 3.5
- * * versions below 3.5 will return `{}` for unresolvable interference
- * * versions above will return `unknown`
- *
- * @internal
- */
-type AtLeastTS35<True, False> = [True, False][IsUnknown<ReturnType<(<T>() => T)>, 0, 1>];
-/**
- * @internal
- */
-type IsUnknownOrNonInferrable<T, True, False> = AtLeastTS35<IsUnknown<T, True, False>, IsEmptyObj<T, True, IsUnknown<T, True, False>>>;
+type Id<T> = {
+    [K in keyof T]: T[K];
+} & {};
+type WithRequiredProp<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
+type Override<T1, T2> = T2 extends any ? Omit<T1, keyof T2> & T2 : never;
 /**
  * Convert a Union type `(A|B)` to an intersection type `(A&B)`
  */
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
-type ExcludeFromTuple<T, E, Acc extends unknown[] = []> = T extends [
-    infer Head,
-    ...infer Tail
-] ? ExcludeFromTuple<Tail, E, [...Acc, ...([Head] extends [E] ? [] : [Head])]> : Acc;
-type ExtractDispatchFromMiddlewareTuple<MiddlewareTuple extends readonly any[], Acc extends {}> = MiddlewareTuple extends [infer Head, ...infer Tail] ? ExtractDispatchFromMiddlewareTuple<Tail, Acc & (Head extends Middleware<infer D> ? IsAny<D, {}, D> : {})> : Acc;
-type ExtractDispatchExtensions<M> = M extends Tuple<infer MiddlewareTuple> ? ExtractDispatchFromMiddlewareTuple<MiddlewareTuple, {}> : M extends ReadonlyArray<Middleware> ? ExtractDispatchFromMiddlewareTuple<[...M], {}> : never;
-type ExtractStoreExtensionsFromEnhancerTuple<EnhancerTuple extends readonly any[], Acc extends {}> = EnhancerTuple extends [infer Head, ...infer Tail] ? ExtractStoreExtensionsFromEnhancerTuple<Tail, Acc & (Head extends StoreEnhancer<infer Ext> ? IsAny<Ext, {}, Ext> : {})> : Acc;
-type ExtractStoreExtensions<E> = E extends Tuple<infer EnhancerTuple> ? ExtractStoreExtensionsFromEnhancerTuple<EnhancerTuple, {}> : E extends ReadonlyArray<StoreEnhancer> ? UnionToIntersection<E[number] extends StoreEnhancer<infer Ext> ? Ext extends {} ? IsAny<Ext, {}, Ext> : {} : {}> : never;
-type ExtractStateExtensionsFromEnhancerTuple<EnhancerTuple extends readonly any[], Acc extends {}> = EnhancerTuple extends [infer Head, ...infer Tail] ? ExtractStateExtensionsFromEnhancerTuple<Tail, Acc & (Head extends StoreEnhancer<any, infer StateExt> ? IsAny<StateExt, {}, StateExt> : {})> : Acc;
-type ExtractStateExtensions<E> = E extends Tuple<infer EnhancerTuple> ? ExtractStateExtensionsFromEnhancerTuple<EnhancerTuple, {}> : E extends ReadonlyArray<StoreEnhancer> ? UnionToIntersection<E[number] extends StoreEnhancer<any, infer StateExt> ? StateExt extends {} ? IsAny<StateExt, {}, StateExt> : {} : {}> : never;
-/**
- * Helper type. Passes T out again, but boxes it in a way that it cannot
- * "widen" the type by accident if it is a generic that should be inferred
- * from elsewhere.
- *
- * @internal
- */
+type NonOptionalKeys<T> = {
+    [K in keyof T]-?: undefined extends T[K] ? never : K;
+}[keyof T];
+type HasRequiredProps<T, True, False> = NonOptionalKeys<T> extends never ? False : True;
 type NoInfer<T> = [T][T extends any ? 0 : never];
 type NonUndefined<T> = T extends undefined ? never : T;
-type WithRequiredProp<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
-type WithOptionalProp<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-interface TypeGuard<T> {
-    (value: any): value is T;
-}
-interface HasMatchFunction<T> {
-    match: TypeGuard<T>;
-}
-/** @public */
-type Matcher<T> = HasMatchFunction<T> | TypeGuard<T>;
-/** @public */
-type ActionFromMatcher<M extends Matcher<any>> = M extends Matcher<infer T> ? T : never;
-type Id<T> = {
-    [K in keyof T]: T[K];
-} & {};
-type Tail<T extends any[]> = T extends [any, ...infer Tail] ? Tail : never;
-type UnknownIfNonSpecific<T> = {} extends T ? unknown : T;
-/**
- * A Promise that will never reject.
- * @see https://github.com/reduxjs/redux-toolkit/issues/4101
- */
-type SafePromise<T> = Promise<T> & {
-    __linterBrands: 'SafePromise';
-};
+type UnwrapPromise<T> = T extends PromiseLike<infer V> ? V : T;
+type MaybePromise<T> = T | PromiseLike<T>;
+type OmitFromUnion<T, K extends keyof T> = T extends any ? Omit<T, K> : never;
+type IsAny<T, True, False = never> = true | false extends (T extends never ? true : false) ? True : False;
+type CastAny<T, CastTo> = IsAny<T, CastTo, T>;
 
-interface ThunkOptions<E = any> {
-    extraArgument: E;
-}
-interface GetDefaultMiddlewareOptions {
-    thunk?: boolean | ThunkOptions;
-    immutableCheck?: boolean | ImmutableStateInvariantMiddlewareOptions;
-    serializableCheck?: boolean | SerializableStateInvariantMiddlewareOptions;
-    actionCreatorCheck?: boolean | ActionCreatorInvariantMiddlewareOptions;
-}
-type ThunkMiddlewareFor<S, O extends GetDefaultMiddlewareOptions = {}> = O extends {
-    thunk: false;
-} ? never : O extends {
-    thunk: {
-        extraArgument: infer E;
-    };
-} ? ThunkMiddleware<S, UnknownAction, E> : ThunkMiddleware<S, UnknownAction>;
-type GetDefaultMiddleware<S = any> = <O extends GetDefaultMiddlewareOptions = {
-    thunk: true;
-    immutableCheck: true;
-    serializableCheck: true;
-    actionCreatorCheck: true;
-}>(options?: O) => Tuple<ExcludeFromTuple<[ThunkMiddlewareFor<S, O>], never>>;
-
-declare const SHOULD_AUTOBATCH = "RTK_autoBatch";
-declare const prepareAutoBatched: <T>() => (payload: T) => {
-    payload: T;
-    meta: unknown;
-};
-type AutoBatchOptions = {
-    type: 'tick';
-} | {
-    type: 'timer';
-    timeout: number;
-} | {
-    type: 'raf';
-} | {
-    type: 'callback';
-    queueNotification: (notify: () => void) => void;
-};
-/**
- * A Redux store enhancer that watches for "low-priority" actions, and delays
- * notifying subscribers until either the queued callback executes or the
- * next "standard-priority" action is dispatched.
- *
- * This allows dispatching multiple "low-priority" actions in a row with only
- * a single subscriber notification to the UI after the sequence of actions
- * is finished, thus improving UI re-render performance.
- *
- * Watches for actions with the `action.meta[SHOULD_AUTOBATCH]` attribute.
- * This can be added to `action.meta` manually, or by using the
- * `prepareAutoBatched` helper.
- *
- * By default, it will queue a notification for the end of the event loop tick.
- * However, you can pass several other options to configure the behavior:
- * - `{type: 'tick'}`: queues using `queueMicrotask`
- * - `{type: 'timer', timeout: number}`: queues using `setTimeout`
- * - `{type: 'raf'}`: queues using `requestAnimationFrame` (default)
- * - `{type: 'callback', queueNotification: (notify: () => void) => void}`: lets you provide your own callback
- *
- *
- */
-declare const autoBatchEnhancer: (options?: AutoBatchOptions) => StoreEnhancer;
-
-type GetDefaultEnhancersOptions = {
-    autoBatch?: boolean | AutoBatchOptions;
-};
-type GetDefaultEnhancers<M extends Middlewares<any>> = (options?: GetDefaultEnhancersOptions) => Tuple<[StoreEnhancer<{
-    dispatch: ExtractDispatchExtensions<M>;
-}>]>;
-
-/**
- * Options for `configureStore()`.
- *
- * @public
- */
-interface ConfigureStoreOptions<S = any, A extends Action = UnknownAction, M extends Tuple<Middlewares<S>> = Tuple<Middlewares<S>>, E extends Tuple<Enhancers> = Tuple<Enhancers>, P = S> {
-    /**
-     * A single reducer function that will be used as the root reducer, or an
-     * object of slice reducers that will be passed to `combineReducers()`.
-     */
-    reducer: Reducer<S, A, P> | ReducersMapObject<S, A, P>;
-    /**
-     * An array of Redux middleware to install, or a callback receiving `getDefaultMiddleware` and returning a Tuple of middleware.
-     * If not supplied, defaults to the set of middleware returned by `getDefaultMiddleware()`.
-     *
-     * @example `middleware: (gDM) => gDM().concat(logger, apiMiddleware, yourCustomMiddleware)`
-     * @see https://redux-toolkit.js.org/api/getDefaultMiddleware#intended-usage
-     */
-    middleware?: (getDefaultMiddleware: GetDefaultMiddleware<S>) => M;
-    /**
-     * Whether to enable Redux DevTools integration. Defaults to `true`.
-     *
-     * Additional configuration can be done by passing Redux DevTools options
-     */
-    devTools?: boolean | DevToolsEnhancerOptions;
-    /**
-     * Whether to check for duplicate middleware instances. Defaults to `true`.
-     */
-    duplicateMiddlewareCheck?: boolean;
-    /**
-     * The initial state, same as Redux's createStore.
-     * You may optionally specify it to hydrate the state
-     * from the server in universal apps, or to restore a previously serialized
-     * user session. If you use `combineReducers()` to produce the root reducer
-     * function (either directly or indirectly by passing an object as `reducer`),
-     * this must be an object with the same shape as the reducer map keys.
-     */
-    preloadedState?: P;
-    /**
-     * The store enhancers to apply. See Redux's `createStore()`.
-     * All enhancers will be included before the DevTools Extension enhancer.
-     * If you need to customize the order of enhancers, supply a callback
-     * function that will receive a `getDefaultEnhancers` function that returns a Tuple,
-     * and should return a Tuple of enhancers (such as `getDefaultEnhancers().concat(offline)`).
-     * If you only need to add middleware, you can use the `middleware` parameter instead.
-     */
-    enhancers?: (getDefaultEnhancers: GetDefaultEnhancers<M>) => E;
-}
-type Middlewares<S> = ReadonlyArray<Middleware<{}, S>>;
-type Enhancers = ReadonlyArray<StoreEnhancer>;
-/**
- * A Redux store returned by `configureStore()`. Supports dispatching
- * side-effectful _thunks_ in addition to plain actions.
- *
- * @public
- */
-type EnhancedStore<S = any, A extends Action = UnknownAction, E extends Enhancers = Enhancers> = ExtractStoreExtensions<E> & Store<S, A, UnknownIfNonSpecific<ExtractStateExtensions<E>>>;
-/**
- * A friendly abstraction over the standard Redux `createStore()` function.
- *
- * @param options The store configuration.
- * @returns A configured Redux store.
- *
- * @public
- */
-declare function configureStore<S = any, A extends Action = UnknownAction, M extends Tuple<Middlewares<S>> = Tuple<[ThunkMiddlewareFor<S>]>, E extends Tuple<Enhancers> = Tuple<[
-    StoreEnhancer<{
-        dispatch: ExtractDispatchExtensions<M>;
-    }>,
-    StoreEnhancer
-]>, P = S>(options: ConfigureStoreOptions<S, A, M, E, P>): EnhancedStore<S, A, E>;
-
-/**
- * An action with a string type and an associated payload. This is the
- * type of action returned by `createAction()` action creators.
- *
- * @template P The type of the action's payload.
- * @template T the type used for the action type.
- * @template M The type of the action's meta (optional)
- * @template E The type of the action's error (optional)
- *
- * @public
- */
-type PayloadAction<P = void, T extends string = string, M = never, E = never> = {
-    payload: P;
-    type: T;
-} & ([M] extends [never] ? {} : {
-    meta: M;
-}) & ([E] extends [never] ? {} : {
-    error: E;
-});
-/**
- * A "prepare" method to be used as the second parameter of `createAction`.
- * Takes any number of arguments and returns a Flux Standard Action without
- * type (will be added later) that *must* contain a payload (might be undefined).
- *
- * @public
- */
-type PrepareAction<P> = ((...args: any[]) => {
-    payload: P;
-}) | ((...args: any[]) => {
-    payload: P;
-    meta: any;
-}) | ((...args: any[]) => {
-    payload: P;
-    error: any;
-}) | ((...args: any[]) => {
-    payload: P;
-    meta: any;
-    error: any;
-});
-/**
- * Internal version of `ActionCreatorWithPreparedPayload`. Not to be used externally.
- *
- * @internal
- */
-type _ActionCreatorWithPreparedPayload<PA extends PrepareAction<any> | void, T extends string = string> = PA extends PrepareAction<infer P> ? ActionCreatorWithPreparedPayload<Parameters<PA>, P, T, ReturnType<PA> extends {
-    error: infer E;
-} ? E : never, ReturnType<PA> extends {
-    meta: infer M;
-} ? M : never> : void;
-/**
- * Basic type for all action creators.
- *
- * @inheritdoc {redux#ActionCreator}
- */
-type BaseActionCreator<P, T extends string, M = never, E = never> = {
-    type: T;
-    match: (action: unknown) => action is PayloadAction<P, T, M, E>;
-};
-/**
- * An action creator that takes multiple arguments that are passed
- * to a `PrepareAction` method to create the final Action.
- * @typeParam Args arguments for the action creator function
- * @typeParam P `payload` type
- * @typeParam T `type` name
- * @typeParam E optional `error` type
- * @typeParam M optional `meta` type
- *
- * @inheritdoc {redux#ActionCreator}
- *
- * @public
- */
-interface ActionCreatorWithPreparedPayload<Args extends unknown[], P, T extends string = string, E = never, M = never> extends BaseActionCreator<P, T, M, E> {
-    /**
-     * Calling this {@link redux#ActionCreator} with `Args` will return
-     * an Action with a payload of type `P` and (depending on the `PrepareAction`
-     * method used) a `meta`- and `error` property of types `M` and `E` respectively.
-     */
-    (...args: Args): PayloadAction<P, T, M, E>;
-}
-/**
- * An action creator of type `T` that takes an optional payload of type `P`.
- *
- * @inheritdoc {redux#ActionCreator}
- *
- * @public
- */
-interface ActionCreatorWithOptionalPayload<P, T extends string = string> extends BaseActionCreator<P, T> {
-    /**
-     * Calling this {@link redux#ActionCreator} with an argument will
-     * return a {@link PayloadAction} of type `T` with a payload of `P`.
-     * Calling it without an argument will return a PayloadAction with a payload of `undefined`.
-     */
-    (payload?: P): PayloadAction<P, T>;
-}
-/**
- * An action creator of type `T` that takes no payload.
- *
- * @inheritdoc {redux#ActionCreator}
- *
- * @public
- */
-interface ActionCreatorWithoutPayload<T extends string = string> extends BaseActionCreator<undefined, T> {
-    /**
-     * Calling this {@link redux#ActionCreator} will
-     * return a {@link PayloadAction} of type `T` with a payload of `undefined`
-     */
-    (noArgument: void): PayloadAction<undefined, T>;
-}
-/**
- * An action creator of type `T` that requires a payload of type P.
- *
- * @inheritdoc {redux#ActionCreator}
- *
- * @public
- */
-interface ActionCreatorWithPayload<P, T extends string = string> extends BaseActionCreator<P, T> {
-    /**
-     * Calling this {@link redux#ActionCreator} with an argument will
-     * return a {@link PayloadAction} of type `T` with a payload of `P`
-     */
-    (payload: P): PayloadAction<P, T>;
-}
-/**
- * An action creator of type `T` whose `payload` type could not be inferred. Accepts everything as `payload`.
- *
- * @inheritdoc {redux#ActionCreator}
- *
- * @public
- */
-interface ActionCreatorWithNonInferrablePayload<T extends string = string> extends BaseActionCreator<unknown, T> {
-    /**
-     * Calling this {@link redux#ActionCreator} with an argument will
-     * return a {@link PayloadAction} of type `T` with a payload
-     * of exactly the type of the argument.
-     */
-    <PT extends unknown>(payload: PT): PayloadAction<PT, T>;
-}
-/**
- * An action creator that produces actions with a `payload` attribute.
- *
- * @typeParam P the `payload` type
- * @typeParam T the `type` of the resulting action
- * @typeParam PA if the resulting action is preprocessed by a `prepare` method, the signature of said method.
- *
- * @public
- */
-type PayloadActionCreator<P = void, T extends string = string, PA extends PrepareAction<P> | void = void> = IfPrepareActionMethodProvided<PA, _ActionCreatorWithPreparedPayload<PA, T>, IsAny<P, ActionCreatorWithPayload<any, T>, IsUnknownOrNonInferrable<P, ActionCreatorWithNonInferrablePayload<T>, IfVoid<P, ActionCreatorWithoutPayload<T>, IfMaybeUndefined<P, ActionCreatorWithOptionalPayload<P, T>, ActionCreatorWithPayload<P, T>>>>>>;
-/**
- * A utility function to create an action creator for the given action type
- * string. The action creator accepts a single argument, which will be included
- * in the action object as a field called payload. The action creator function
- * will also have its toString() overridden so that it returns the action type.
- *
- * @param type The action type to use for created actions.
- * @param prepare (optional) a method that takes any number of arguments and returns { payload } or { payload, meta }.
- *                If this is given, the resulting action creator will pass its arguments to this method to calculate payload & meta.
- *
- * @public
- */
-declare function createAction<P = void, T extends string = string>(type: T): PayloadActionCreator<P, T>;
-/**
- * A utility function to create an action creator for the given action type
- * string. The action creator accepts a single argument, which will be included
- * in the action object as a field called payload. The action creator function
- * will also have its toString() overridden so that it returns the action type.
- *
- * @param type The action type to use for created actions.
- * @param prepare (optional) a method that takes any number of arguments and returns { payload } or { payload, meta }.
- *                If this is given, the resulting action creator will pass its arguments to this method to calculate payload & meta.
- *
- * @public
- */
-declare function createAction<PA extends PrepareAction<any>, T extends string = string>(type: T, prepareAction: PA): PayloadActionCreator<ReturnType<PA>['payload'], T, PA>;
-/**
- * Returns true if value is an RTK-like action creator, with a static type property and match method.
- */
-declare function isActionCreator(action: unknown): action is BaseActionCreator<unknown, string> & Function;
-/**
- * Returns true if value is an action with a string type and valid Flux Standard Action keys.
- */
-declare function isFSA(action: unknown): action is {
-    type: string;
-    payload?: unknown;
-    error?: unknown;
-    meta?: unknown;
-};
-type IfPrepareActionMethodProvided<PA extends PrepareAction<any> | void, True, False> = PA extends (...args: any[]) => any ? True : False;
-
-type BaseThunkAPI<S, E, D extends Dispatch = Dispatch, RejectedValue = unknown, RejectedMeta = unknown, FulfilledMeta = unknown> = {
-    dispatch: D;
-    getState: () => S;
-    extra: E;
-    requestId: string;
+interface BaseQueryApi {
     signal: AbortSignal;
     abort: (reason?: string) => void;
-    rejectWithValue: IsUnknown<RejectedMeta, (value: RejectedValue) => RejectWithValue<RejectedValue, RejectedMeta>, (value: RejectedValue, meta: RejectedMeta) => RejectWithValue<RejectedValue, RejectedMeta>>;
-    fulfillWithValue: IsUnknown<FulfilledMeta, <FulfilledValue>(value: FulfilledValue) => FulfilledValue, <FulfilledValue>(value: FulfilledValue, meta: FulfilledMeta) => FulfillWithMeta<FulfilledValue, FulfilledMeta>>;
-};
-/**
- * @public
- */
-interface SerializedError {
-    name?: string;
-    message?: string;
-    stack?: string;
-    code?: string;
+    dispatch: ThunkDispatch<any, any, any>;
+    getState: () => unknown;
+    extra: unknown;
+    endpoint: string;
+    type: 'query' | 'mutation';
+    /**
+     * Only available for queries: indicates if a query has been forced,
+     * i.e. it would have been fetched even if there would already be a cache entry
+     * (this does not mean that there is already a cache entry though!)
+     *
+     * This can be used to for example add a `Cache-Control: no-cache` header for
+     * invalidated queries.
+     */
+    forced?: boolean;
+    /**
+     * Only available for queries: the cache key that was used to store the query result
+     */
+    queryCacheKey?: string;
 }
-declare class RejectWithValue<Payload, RejectedMeta> {
-    readonly payload: Payload;
-    readonly meta: RejectedMeta;
-    private readonly _type;
-    constructor(payload: Payload, meta: RejectedMeta);
-}
-declare class FulfillWithMeta<Payload, FulfilledMeta> {
-    readonly payload: Payload;
-    readonly meta: FulfilledMeta;
-    private readonly _type;
-    constructor(payload: Payload, meta: FulfilledMeta);
-}
-/**
- * Serializes an error into a plain object.
- * Reworked from https://github.com/sindresorhus/serialize-error
- *
- * @public
- */
-declare const miniSerializeError: (value: any) => SerializedError;
-type AsyncThunkConfig = {
-    state?: unknown;
-    dispatch?: ThunkDispatch<unknown, unknown, UnknownAction>;
-    extra?: unknown;
-    rejectValue?: unknown;
-    serializedErrorType?: unknown;
-    pendingMeta?: unknown;
-    fulfilledMeta?: unknown;
-    rejectedMeta?: unknown;
+type QueryReturnValue<T = unknown, E = unknown, M = unknown> = {
+    error: E;
+    data?: undefined;
+    meta?: M;
+} | {
+    error?: undefined;
+    data: T;
+    meta?: M;
 };
-type GetState<ThunkApiConfig> = ThunkApiConfig extends {
-    state: infer State;
-} ? State : unknown;
-type GetExtra<ThunkApiConfig> = ThunkApiConfig extends {
-    extra: infer Extra;
-} ? Extra : unknown;
-type GetDispatch<ThunkApiConfig> = ThunkApiConfig extends {
-    dispatch: infer Dispatch;
-} ? FallbackIfUnknown<Dispatch, ThunkDispatch<GetState<ThunkApiConfig>, GetExtra<ThunkApiConfig>, UnknownAction>> : ThunkDispatch<GetState<ThunkApiConfig>, GetExtra<ThunkApiConfig>, UnknownAction>;
-type GetThunkAPI<ThunkApiConfig> = BaseThunkAPI<GetState<ThunkApiConfig>, GetExtra<ThunkApiConfig>, GetDispatch<ThunkApiConfig>, GetRejectValue<ThunkApiConfig>, GetRejectedMeta<ThunkApiConfig>, GetFulfilledMeta<ThunkApiConfig>>;
-type GetRejectValue<ThunkApiConfig> = ThunkApiConfig extends {
-    rejectValue: infer RejectValue;
-} ? RejectValue : unknown;
-type GetPendingMeta<ThunkApiConfig> = ThunkApiConfig extends {
-    pendingMeta: infer PendingMeta;
-} ? PendingMeta : unknown;
-type GetFulfilledMeta<ThunkApiConfig> = ThunkApiConfig extends {
-    fulfilledMeta: infer FulfilledMeta;
-} ? FulfilledMeta : unknown;
-type GetRejectedMeta<ThunkApiConfig> = ThunkApiConfig extends {
-    rejectedMeta: infer RejectedMeta;
-} ? RejectedMeta : unknown;
-type GetSerializedErrorType<ThunkApiConfig> = ThunkApiConfig extends {
-    serializedErrorType: infer GetSerializedErrorType;
-} ? GetSerializedErrorType : SerializedError;
-type MaybePromise<T> = T | Promise<T> | (T extends any ? Promise<T> : never);
-/**
- * A type describing the return value of the `payloadCreator` argument to `createAsyncThunk`.
- * Might be useful for wrapping `createAsyncThunk` in custom abstractions.
- *
- * @public
- */
-type AsyncThunkPayloadCreatorReturnValue<Returned, ThunkApiConfig extends AsyncThunkConfig> = MaybePromise<IsUnknown<GetFulfilledMeta<ThunkApiConfig>, Returned, FulfillWithMeta<Returned, GetFulfilledMeta<ThunkApiConfig>>> | RejectWithValue<GetRejectValue<ThunkApiConfig>, GetRejectedMeta<ThunkApiConfig>>>;
-/**
- * A type describing the `payloadCreator` argument to `createAsyncThunk`.
- * Might be useful for wrapping `createAsyncThunk` in custom abstractions.
- *
- * @public
- */
-type AsyncThunkPayloadCreator<Returned, ThunkArg = void, ThunkApiConfig extends AsyncThunkConfig = {}> = (arg: ThunkArg, thunkAPI: GetThunkAPI<ThunkApiConfig>) => AsyncThunkPayloadCreatorReturnValue<Returned, ThunkApiConfig>;
-/**
- * A ThunkAction created by `createAsyncThunk`.
- * Dispatching it returns a Promise for either a
- * fulfilled or rejected action.
- * Also, the returned value contains an `abort()` method
- * that allows the asyncAction to be cancelled from the outside.
- *
- * @public
- */
-type AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig extends AsyncThunkConfig> = (dispatch: NonNullable<GetDispatch<ThunkApiConfig>>, getState: () => GetState<ThunkApiConfig>, extra: GetExtra<ThunkApiConfig>) => SafePromise<ReturnType<AsyncThunkFulfilledActionCreator<Returned, ThunkArg>> | ReturnType<AsyncThunkRejectedActionCreator<ThunkArg, ThunkApiConfig>>> & {
-    abort: (reason?: string) => void;
-    requestId: string;
-    arg: ThunkArg;
-    unwrap: () => Promise<Returned>;
-};
-/**
- * Config provided when calling the async thunk action creator.
- */
-interface AsyncThunkDispatchConfig {
-    /**
-     * An external `AbortSignal` that will be tracked by the internal `AbortSignal`.
-     */
-    signal?: AbortSignal;
-}
-type AsyncThunkActionCreator<Returned, ThunkArg, ThunkApiConfig extends AsyncThunkConfig> = IsAny<ThunkArg, (arg: ThunkArg, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig>, unknown extends ThunkArg ? (arg: ThunkArg, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig> : [ThunkArg] extends [void] | [undefined] ? (arg?: undefined, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig> : [void] extends [ThunkArg] ? (arg?: ThunkArg, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig> : [undefined] extends [ThunkArg] ? WithStrictNullChecks<(arg?: ThunkArg, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig>, (arg: ThunkArg, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig>> : (arg: ThunkArg, config?: AsyncThunkDispatchConfig) => AsyncThunkAction<Returned, ThunkArg, ThunkApiConfig>>;
-/**
- * Options object for `createAsyncThunk`.
- *
- * @public
- */
-type AsyncThunkOptions<ThunkArg = void, ThunkApiConfig extends AsyncThunkConfig = {}> = {
-    /**
-     * A method to control whether the asyncThunk should be executed. Has access to the
-     * `arg`, `api.getState()` and `api.extra` arguments.
-     *
-     * @returns `false` if it should be skipped
-     */
-    condition?(arg: ThunkArg, api: Pick<GetThunkAPI<ThunkApiConfig>, 'getState' | 'extra'>): MaybePromise<boolean | undefined>;
-    /**
-     * If `condition` returns `false`, the asyncThunk will be skipped.
-     * This option allows you to control whether a `rejected` action with `meta.condition == false`
-     * will be dispatched or not.
-     *
-     * @default `false`
-     */
-    dispatchConditionRejection?: boolean;
-    serializeError?: (x: unknown) => GetSerializedErrorType<ThunkApiConfig>;
-    /**
-     * A function to use when generating the `requestId` for the request sequence.
-     *
-     * @default `nanoid`
-     */
-    idGenerator?: (arg: ThunkArg) => string;
-} & IsUnknown<GetPendingMeta<ThunkApiConfig>, {
-    /**
-     * A method to generate additional properties to be added to `meta` of the pending action.
-     *
-     * Using this optional overload will not modify the types correctly, this overload is only in place to support JavaScript users.
-     * Please use the `ThunkApiConfig` parameter `pendingMeta` to get access to a correctly typed overload
-     */
-    getPendingMeta?(base: {
-        arg: ThunkArg;
-        requestId: string;
-    }, api: Pick<GetThunkAPI<ThunkApiConfig>, 'getState' | 'extra'>): GetPendingMeta<ThunkApiConfig>;
-}, {
-    /**
-     * A method to generate additional properties to be added to `meta` of the pending action.
-     */
-    getPendingMeta(base: {
-        arg: ThunkArg;
-        requestId: string;
-    }, api: Pick<GetThunkAPI<ThunkApiConfig>, 'getState' | 'extra'>): GetPendingMeta<ThunkApiConfig>;
-}>;
-type AsyncThunkPendingActionCreator<ThunkArg, ThunkApiConfig = {}> = ActionCreatorWithPreparedPayload<[
-    string,
-    ThunkArg,
-    GetPendingMeta<ThunkApiConfig>?
-], undefined, string, never, {
-    arg: ThunkArg;
-    requestId: string;
-    requestStatus: 'pending';
-} & GetPendingMeta<ThunkApiConfig>>;
-type AsyncThunkRejectedActionCreator<ThunkArg, ThunkApiConfig = {}> = ActionCreatorWithPreparedPayload<[
-    Error | null,
-    string,
-    ThunkArg,
-    GetRejectValue<ThunkApiConfig>?,
-    GetRejectedMeta<ThunkApiConfig>?
-], GetRejectValue<ThunkApiConfig> | undefined, string, GetSerializedErrorType<ThunkApiConfig>, {
-    arg: ThunkArg;
-    requestId: string;
-    requestStatus: 'rejected';
-    aborted: boolean;
-    condition: boolean;
-} & (({
-    rejectedWithValue: false;
-} & {
-    [K in keyof GetRejectedMeta<ThunkApiConfig>]?: undefined;
-}) | ({
-    rejectedWithValue: true;
-} & GetRejectedMeta<ThunkApiConfig>))>;
-type AsyncThunkFulfilledActionCreator<Returned, ThunkArg, ThunkApiConfig = {}> = ActionCreatorWithPreparedPayload<[
-    Returned,
-    string,
-    ThunkArg,
-    GetFulfilledMeta<ThunkApiConfig>?
-], Returned, string, never, {
-    arg: ThunkArg;
-    requestId: string;
-    requestStatus: 'fulfilled';
-} & GetFulfilledMeta<ThunkApiConfig>>;
-/**
- * A type describing the return value of `createAsyncThunk`.
- * Might be useful for wrapping `createAsyncThunk` in custom abstractions.
- *
- * @public
- */
-type AsyncThunk<Returned, ThunkArg, ThunkApiConfig extends AsyncThunkConfig> = AsyncThunkActionCreator<Returned, ThunkArg, ThunkApiConfig> & {
-    pending: AsyncThunkPendingActionCreator<ThunkArg, ThunkApiConfig>;
-    rejected: AsyncThunkRejectedActionCreator<ThunkArg, ThunkApiConfig>;
-    fulfilled: AsyncThunkFulfilledActionCreator<Returned, ThunkArg, ThunkApiConfig>;
-    settled: (action: any) => action is ReturnType<AsyncThunkRejectedActionCreator<ThunkArg, ThunkApiConfig> | AsyncThunkFulfilledActionCreator<Returned, ThunkArg, ThunkApiConfig>>;
-    typePrefix: string;
-};
-type OverrideThunkApiConfigs<OldConfig, NewConfig> = Id<NewConfig & Omit<OldConfig, keyof NewConfig>>;
-type CreateAsyncThunkFunction<CurriedThunkApiConfig extends AsyncThunkConfig> = {
-    /**
-     *
-     * @param typePrefix
-     * @param payloadCreator
-     * @param options
-     *
-     * @public
-     */
-    <Returned, ThunkArg = void>(typePrefix: string, payloadCreator: AsyncThunkPayloadCreator<Returned, ThunkArg, CurriedThunkApiConfig>, options?: AsyncThunkOptions<ThunkArg, CurriedThunkApiConfig>): AsyncThunk<Returned, ThunkArg, CurriedThunkApiConfig>;
-    /**
-     *
-     * @param typePrefix
-     * @param payloadCreator
-     * @param options
-     *
-     * @public
-     */
-    <Returned, ThunkArg, ThunkApiConfig extends AsyncThunkConfig>(typePrefix: string, payloadCreator: AsyncThunkPayloadCreator<Returned, ThunkArg, OverrideThunkApiConfigs<CurriedThunkApiConfig, ThunkApiConfig>>, options?: AsyncThunkOptions<ThunkArg, OverrideThunkApiConfigs<CurriedThunkApiConfig, ThunkApiConfig>>): AsyncThunk<Returned, ThunkArg, OverrideThunkApiConfigs<CurriedThunkApiConfig, ThunkApiConfig>>;
-};
-type CreateAsyncThunk<CurriedThunkApiConfig extends AsyncThunkConfig> = CreateAsyncThunkFunction<CurriedThunkApiConfig> & {
-    withTypes<ThunkApiConfig extends AsyncThunkConfig>(): CreateAsyncThunk<OverrideThunkApiConfigs<CurriedThunkApiConfig, ThunkApiConfig>>;
-};
-declare const createAsyncThunk: CreateAsyncThunk<AsyncThunkConfig>;
-interface UnwrappableAction {
-    payload: any;
-    meta?: any;
-    error?: any;
-}
-type UnwrappedActionPayload<T extends UnwrappableAction> = Exclude<T, {
-    error: any;
-}>['payload'];
+type BaseQueryFn<Args = any, Result = unknown, Error = unknown, DefinitionExtraOptions = {}, Meta = {}> = (args: Args, api: BaseQueryApi, extraOptions: DefinitionExtraOptions) => MaybePromise<QueryReturnValue<Result, Error, Meta>>;
+type BaseQueryEnhancer<AdditionalArgs = unknown, AdditionalDefinitionExtraOptions = unknown, Config = void> = <BaseQuery extends BaseQueryFn>(baseQuery: BaseQuery, config: Config) => BaseQueryFn<BaseQueryArg<BaseQuery> & AdditionalArgs, BaseQueryResult<BaseQuery>, BaseQueryError<BaseQuery>, BaseQueryExtraOptions<BaseQuery> & AdditionalDefinitionExtraOptions, NonNullable<BaseQueryMeta<BaseQuery>>>;
 /**
  * @public
  */
-declare function unwrapResult<R extends UnwrappableAction>(action: R): UnwrappedActionPayload<R>;
-type WithStrictNullChecks<True, False> = undefined extends boolean ? False : True;
+type BaseQueryResult<BaseQuery extends BaseQueryFn> = UnwrapPromise<ReturnType<BaseQuery>> extends infer Unwrapped ? Unwrapped extends {
+    data: any;
+} ? Unwrapped['data'] : never : never;
+/**
+ * @public
+ */
+type BaseQueryMeta<BaseQuery extends BaseQueryFn> = UnwrapPromise<ReturnType<BaseQuery>>['meta'];
+/**
+ * @public
+ */
+type BaseQueryError<BaseQuery extends BaseQueryFn> = Exclude<UnwrapPromise<ReturnType<BaseQuery>>, {
+    error?: undefined;
+}>['error'];
+/**
+ * @public
+ */
+type BaseQueryArg<T extends (arg: any, ...args: any[]) => any> = T extends (arg: infer A, ...args: any[]) => any ? A : any;
+/**
+ * @public
+ */
+type BaseQueryExtraOptions<BaseQuery extends BaseQueryFn> = Parameters<BaseQuery>[2];
 
-type AsyncThunkReducers<State, ThunkArg extends any, Returned = unknown, ThunkApiConfig extends AsyncThunkConfig = {}> = {
-    pending?: CaseReducer<State, ReturnType<AsyncThunk<Returned, ThunkArg, ThunkApiConfig>['pending']>>;
-    rejected?: CaseReducer<State, ReturnType<AsyncThunk<Returned, ThunkArg, ThunkApiConfig>['rejected']>>;
-    fulfilled?: CaseReducer<State, ReturnType<AsyncThunk<Returned, ThunkArg, ThunkApiConfig>['fulfilled']>>;
-    settled?: CaseReducer<State, ReturnType<AsyncThunk<Returned, ThunkArg, ThunkApiConfig>['rejected' | 'fulfilled']>>;
-};
-type TypedActionCreator<Type extends string> = {
-    (...args: any[]): Action<Type>;
-    type: Type;
-};
-/**
- * A builder for an action <-> reducer map.
- *
- * @public
- */
-interface ActionReducerMapBuilder<State> {
+declare const defaultSerializeQueryArgs: SerializeQueryArgs<any>;
+type SerializeQueryArgs<QueryArgs, ReturnType = string> = (_: {
+    queryArgs: QueryArgs;
+    endpointDefinition: EndpointDefinition<any, any, any, any>;
+    endpointName: string;
+}) => ReturnType;
+type InternalSerializeQueryArgs = (_: {
+    queryArgs: any;
+    endpointDefinition: EndpointDefinition<any, any, any, any>;
+    endpointName: string;
+}) => QueryCacheKey;
+
+interface CreateApiOptions<BaseQuery extends BaseQueryFn, Definitions extends EndpointDefinitions, ReducerPath extends string = 'api', TagTypes extends string = never> {
     /**
-     * Adds a case reducer to handle a single exact action type.
-     * @remarks
-     * All calls to `builder.addCase` must come before any calls to `builder.addMatcher` or `builder.addDefaultCase`.
-     * @param actionCreator - Either a plain action type string, or an action creator generated by [`createAction`](./createAction) that can be used to determine the action type.
-     * @param reducer - The actual case reducer function.
-     */
-    addCase<ActionCreator extends TypedActionCreator<string>>(actionCreator: ActionCreator, reducer: CaseReducer<State, ReturnType<ActionCreator>>): ActionReducerMapBuilder<State>;
-    /**
-     * Adds a case reducer to handle a single exact action type.
-     * @remarks
-     * All calls to `builder.addCase` must come before any calls to `builder.addAsyncThunk`, `builder.addMatcher` or `builder.addDefaultCase`.
-     * @param actionCreator - Either a plain action type string, or an action creator generated by [`createAction`](./createAction) that can be used to determine the action type.
-     * @param reducer - The actual case reducer function.
-     */
-    addCase<Type extends string, A extends Action<Type>>(type: Type, reducer: CaseReducer<State, A>): ActionReducerMapBuilder<State>;
-    /**
-     * Adds case reducers to handle actions based on a `AsyncThunk` action creator.
-     * @remarks
-     * All calls to `builder.addAsyncThunk` must come before after any calls to `builder.addCase` and before any calls to `builder.addMatcher` or `builder.addDefaultCase`.
-     * @param asyncThunk - The async thunk action creator itself.
-     * @param reducers - A mapping from each of the `AsyncThunk` action types to the case reducer that should handle those actions.
-     * @example
-  ```ts no-transpile
-  import { createAsyncThunk, createReducer } from '@reduxjs/toolkit'
-  
-  const fetchUserById = createAsyncThunk('users/fetchUser', async (id) => {
-    const response = await fetch(`https://reqres.in/api/users/${id}`)
-    return (await response.json()).data
-  })
-  
-  const reducer = createReducer(initialState, (builder) => {
-    builder.addAsyncThunk(fetchUserById, {
-      pending: (state, action) => {
-        state.fetchUserById.loading = 'pending'
-      },
-      fulfilled: (state, action) => {
-        state.fetchUserById.data = action.payload
-      },
-      rejected: (state, action) => {
-        state.fetchUserById.error = action.error
-      },
-      settled: (state, action) => {
-        state.fetchUserById.loading = action.meta.requestStatus
-      },
-    })
-  })
-     */
-    addAsyncThunk<Returned, ThunkArg, ThunkApiConfig extends AsyncThunkConfig = {}>(asyncThunk: AsyncThunk<Returned, ThunkArg, ThunkApiConfig>, reducers: AsyncThunkReducers<State, ThunkArg, Returned, ThunkApiConfig>): Omit<ActionReducerMapBuilder<State>, 'addCase'>;
-    /**
-     * Allows you to match your incoming actions against your own filter function instead of only the `action.type` property.
-     * @remarks
-     * If multiple matcher reducers match, all of them will be executed in the order
-     * they were defined in - even if a case reducer already matched.
-     * All calls to `builder.addMatcher` must come after any calls to `builder.addCase` and `builder.addAsyncThunk` and before any calls to `builder.addDefaultCase`.
-     * @param matcher - A matcher function. In TypeScript, this should be a [type predicate](https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates)
-     *   function
-     * @param reducer - The actual case reducer function.
+     * The base query used by each endpoint if no `queryFn` option is specified. RTK Query exports a utility called [fetchBaseQuery](./fetchBaseQuery) as a lightweight wrapper around `fetch` for common use-cases. See [Customizing Queries](../../rtk-query/usage/customizing-queries) if `fetchBaseQuery` does not handle your requirements.
      *
      * @example
-  ```ts
-  import {
-    createAction,
-    createReducer,
-    AsyncThunk,
-    UnknownAction,
-  } from "@reduxjs/toolkit";
-  
-  type GenericAsyncThunk = AsyncThunk<unknown, unknown, any>;
-  
-  type PendingAction = ReturnType<GenericAsyncThunk["pending"]>;
-  type RejectedAction = ReturnType<GenericAsyncThunk["rejected"]>;
-  type FulfilledAction = ReturnType<GenericAsyncThunk["fulfilled"]>;
-  
-  const initialState: Record<string, string> = {};
-  const resetAction = createAction("reset-tracked-loading-state");
-  
-  function isPendingAction(action: UnknownAction): action is PendingAction {
-    return typeof action.type === "string" && action.type.endsWith("/pending");
-  }
-  
-  const reducer = createReducer(initialState, (builder) => {
-    builder
-      .addCase(resetAction, () => initialState)
-      // matcher can be defined outside as a type predicate function
-      .addMatcher(isPendingAction, (state, action) => {
-        state[action.meta.requestId] = "pending";
-      })
-      .addMatcher(
-        // matcher can be defined inline as a type predicate function
-        (action): action is RejectedAction => action.type.endsWith("/rejected"),
-        (state, action) => {
-          state[action.meta.requestId] = "rejected";
-        }
-      )
-      // matcher can just return boolean and the matcher can receive a generic argument
-      .addMatcher<FulfilledAction>(
-        (action) => action.type.endsWith("/fulfilled"),
-        (state, action) => {
-          state[action.meta.requestId] = "fulfilled";
-        }
-      );
-  });
-  ```
-     */
-    addMatcher<A>(matcher: TypeGuard<A> | ((action: any) => boolean), reducer: CaseReducer<State, A extends Action ? A : A & Action>): Omit<ActionReducerMapBuilder<State>, 'addCase' | 'addAsyncThunk'>;
-    /**
-     * Adds a "default case" reducer that is executed if no case reducer and no matcher
-     * reducer was executed for this action.
-     * @param reducer - The fallback "default case" reducer function.
-     *
-     * @example
-  ```ts
-  import { createReducer } from '@reduxjs/toolkit'
-  const initialState = { otherActions: 0 }
-  const reducer = createReducer(initialState, builder => {
-    builder
-      // .addCase(...)
-      // .addMatcher(...)
-      .addDefaultCase((state, action) => {
-        state.otherActions++
-      })
-  })
-  ```
-     */
-    addDefaultCase(reducer: CaseReducer<State, Action>): {};
-}
-
-/**
- * Defines a mapping from action types to corresponding action object shapes.
- *
- * @deprecated This should not be used manually - it is only used for internal
- *             inference purposes and should not have any further value.
- *             It might be removed in the future.
- * @public
- */
-type Actions<T extends keyof any = string> = Record<T, Action>;
-/**
- * A *case reducer* is a reducer function for a specific action type. Case
- * reducers can be composed to full reducers using `createReducer()`.
- *
- * Unlike a normal Redux reducer, a case reducer is never called with an
- * `undefined` state to determine the initial state. Instead, the initial
- * state is explicitly specified as an argument to `createReducer()`.
- *
- * In addition, a case reducer can choose to mutate the passed-in `state`
- * value directly instead of returning a new state. This does not actually
- * cause the store state to be mutated directly; instead, thanks to
- * [immer](https://github.com/mweststrate/immer), the mutations are
- * translated to copy operations that result in a new state.
- *
- * @public
- */
-type CaseReducer<S = any, A extends Action = UnknownAction> = (state: Draft<S>, action: A) => NoInfer<S> | void | Draft<NoInfer<S>>;
-/**
- * A mapping from action types to case reducers for `createReducer()`.
- *
- * @deprecated This should not be used manually - it is only used
- *             for internal inference purposes and using it manually
- *             would lead to type erasure.
- *             It might be removed in the future.
- * @public
- */
-type CaseReducers<S, AS extends Actions> = {
-    [T in keyof AS]: AS[T] extends Action ? CaseReducer<S, AS[T]> : void;
-};
-type NotFunction<T> = T extends Function ? never : T;
-type ReducerWithInitialState<S extends NotFunction<any>> = Reducer<S> & {
-    getInitialState: () => S;
-};
-/**
- * A utility function that allows defining a reducer as a mapping from action
- * type to *case reducer* functions that handle these action types. The
- * reducer's initial state is passed as the first argument.
- *
- * @remarks
- * The body of every case reducer is implicitly wrapped with a call to
- * `produce()` from the [immer](https://github.com/mweststrate/immer) library.
- * This means that rather than returning a new state object, you can also
- * mutate the passed-in state object directly; these mutations will then be
- * automatically and efficiently translated into copies, giving you both
- * convenience and immutability.
- *
- * @overloadSummary
- * This function accepts a callback that receives a `builder` object as its argument.
- * That builder provides `addCase`, `addMatcher` and `addDefaultCase` functions that may be
- * called to define what actions this reducer will handle.
- *
- * @param initialState - `State | (() => State)`: The initial state that should be used when the reducer is called the first time. This may also be a "lazy initializer" function, which should return an initial state value when called. This will be used whenever the reducer is called with `undefined` as its state value, and is primarily useful for cases like reading initial state from `localStorage`.
- * @param builderCallback - `(builder: Builder) => void` A callback that receives a *builder* object to define
- *   case reducers via calls to `builder.addCase(actionCreatorOrType, reducer)`.
- * @example
-```ts
-import {
-  createAction,
-  createReducer,
-  UnknownAction,
-  PayloadAction,
-} from "@reduxjs/toolkit";
-
-const increment = createAction<number>("increment");
-const decrement = createAction<number>("decrement");
-
-function isActionWithNumberPayload(
-  action: UnknownAction
-): action is PayloadAction<number> {
-  return typeof action.payload === "number";
-}
-
-const reducer = createReducer(
-  {
-    counter: 0,
-    sumOfNumberPayloads: 0,
-    unhandledActions: 0,
-  },
-  (builder) => {
-    builder
-      .addCase(increment, (state, action) => {
-        // action is inferred correctly here
-        state.counter += action.payload;
-      })
-      // You can chain calls, or have separate `builder.addCase()` lines each time
-      .addCase(decrement, (state, action) => {
-        state.counter -= action.payload;
-      })
-      // You can apply a "matcher function" to incoming actions
-      .addMatcher(isActionWithNumberPayload, (state, action) => {})
-      // and provide a default case if no other handlers matched
-      .addDefaultCase((state, action) => {});
-  }
-);
-```
- * @public
- */
-declare function createReducer<S extends NotFunction<any>>(initialState: S | (() => S), mapOrBuilderCallback: (builder: ActionReducerMapBuilder<S>) => void): ReducerWithInitialState<S>;
-
-type SliceLike<ReducerPath extends string, State> = {
-    reducerPath: ReducerPath;
-    reducer: Reducer<State>;
-};
-type AnySliceLike = SliceLike<string, any>;
-type SliceLikeReducerPath<A extends AnySliceLike> = A extends SliceLike<infer ReducerPath, any> ? ReducerPath : never;
-type SliceLikeState<A extends AnySliceLike> = A extends SliceLike<any, infer State> ? State : never;
-type WithSlice<A extends AnySliceLike> = {
-    [Path in SliceLikeReducerPath<A>]: SliceLikeState<A>;
-};
-type ReducerMap = Record<string, Reducer>;
-type ExistingSliceLike<DeclaredState> = {
-    [ReducerPath in keyof DeclaredState]: SliceLike<ReducerPath & string, NonUndefined<DeclaredState[ReducerPath]>>;
-}[keyof DeclaredState];
-type InjectConfig = {
-    /**
-     * Allow replacing reducer with a different reference. Normally, an error will be thrown if a different reducer instance to the one already injected is used.
-     */
-    overrideExisting?: boolean;
-};
-/**
- * A reducer that allows for slices/reducers to be injected after initialisation.
- */
-interface CombinedSliceReducer<InitialState, DeclaredState = InitialState> extends Reducer<DeclaredState, UnknownAction, Partial<DeclaredState>> {
-    /**
-     * Provide a type for slices that will be injected lazily.
-     *
-     * One way to do this would be with interface merging:
-     * ```ts
-     *
-     * export interface LazyLoadedSlices {}
-     *
-     * export const rootReducer = combineSlices(stringSlice).withLazyLoadedSlices<LazyLoadedSlices>();
-     *
-     * // elsewhere
-     *
-     * declare module './reducer' {
-     *   export interface LazyLoadedSlices extends WithSlice<typeof booleanSlice> {}
-     * }
-     *
-     * const withBoolean = rootReducer.inject(booleanSlice);
-     *
-     * // elsewhere again
-     *
-     * declare module './reducer' {
-     *   export interface LazyLoadedSlices {
-     *     customName: CustomState
-     *   }
-     * }
-     *
-     * const withCustom = rootReducer.inject({ reducerPath: "customName", reducer: customSlice.reducer })
-     * ```
-     */
-    withLazyLoadedSlices<Lazy = {}>(): CombinedSliceReducer<InitialState, Id<DeclaredState & Partial<Lazy>>>;
-    /**
-     * Inject a slice.
-     *
-     * Accepts an individual slice, RTKQ API instance, or a "slice-like" { reducerPath, reducer } object.
      *
      * ```ts
-     * rootReducer.inject(booleanSlice)
-     * rootReducer.inject(baseApi)
-     * rootReducer.inject({ reducerPath: 'boolean' as const, reducer: newReducer }, { overrideExisting: true })
-     * ```
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
      *
-     */
-    inject<Sl extends Id<ExistingSliceLike<DeclaredState>>>(slice: Sl, config?: InjectConfig): CombinedSliceReducer<InitialState, Id<DeclaredState & WithSlice<Sl>>>;
-    /**
-     * Inject a slice.
-     *
-     * Accepts an individual slice, RTKQ API instance, or a "slice-like" { reducerPath, reducer } object.
-     *
-     * ```ts
-     * rootReducer.inject(booleanSlice)
-     * rootReducer.inject(baseApi)
-     * rootReducer.inject({ reducerPath: 'boolean' as const, reducer: newReducer }, { overrideExisting: true })
-     * ```
-     *
-     */
-    inject<ReducerPath extends string, State>(slice: SliceLike<ReducerPath, State & (ReducerPath extends keyof DeclaredState ? never : State)>, config?: InjectConfig): CombinedSliceReducer<InitialState, Id<DeclaredState & WithSlice<SliceLike<ReducerPath, State>>>>;
-    /**
-     * Create a selector that guarantees that the slices injected will have a defined value when selector is run.
-     *
-     * ```ts
-     * const selectBooleanWithoutInjection = (state: RootState) => state.boolean;
-     * //                                                                ^? boolean | undefined
-     *
-     * const selectBoolean = rootReducer.inject(booleanSlice).selector((state) => {
-     *   // if action hasn't been dispatched since slice was injected, this would usually be undefined
-     *   // however selector() uses a Proxy around the first parameter to ensure that it evaluates to the initial state instead, if undefined
-     *   return state.boolean;
-     *   //           ^? boolean
-     * })
-     * ```
-     *
-     * If the reducer is nested inside the root state, a selectState callback can be passed to retrieve the reducer's state.
-     *
-     * ```ts
-     *
-     * export interface LazyLoadedSlices {};
-     *
-     * export const innerReducer = combineSlices(stringSlice).withLazyLoadedSlices<LazyLoadedSlices>();
-     *
-     * export const rootReducer = combineSlices({ inner: innerReducer });
-     *
-     * export type RootState = ReturnType<typeof rootReducer>;
-     *
-     * // elsewhere
-     *
-     * declare module "./reducer.ts" {
-     *  export interface LazyLoadedSlices extends WithSlice<typeof booleanSlice> {}
-     * }
-     *
-     * const withBool = innerReducer.inject(booleanSlice);
-     *
-     * const selectBoolean = withBool.selector(
-     *   (state) => state.boolean,
-     *   (rootState: RootState) => state.inner
-     * );
-     * //    now expects to be passed RootState instead of innerReducer state
-     *
-     * ```
-     *
-     * Value passed to selectorFn will be a Proxy - use selector.original(proxy) to get original state value (useful for debugging)
-     *
-     * ```ts
-     * const injectedReducer = rootReducer.inject(booleanSlice);
-     * const selectBoolean = injectedReducer.selector((state) => {
-     *   console.log(injectedReducer.selector.original(state).boolean) // possibly undefined
-     *   return state.boolean
+     * const api = createApi({
+     *   // highlight-start
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   // highlight-end
+     *   endpoints: (build) => ({
+     *     // ...endpoints
+     *   }),
      * })
      * ```
      */
-    selector: {
-        /**
-         * Create a selector that guarantees that the slices injected will have a defined value when selector is run.
-         *
-         * ```ts
-         * const selectBooleanWithoutInjection = (state: RootState) => state.boolean;
-         * //                                                                ^? boolean | undefined
-         *
-         * const selectBoolean = rootReducer.inject(booleanSlice).selector((state) => {
-         *   // if action hasn't been dispatched since slice was injected, this would usually be undefined
-         *   // however selector() uses a Proxy around the first parameter to ensure that it evaluates to the initial state instead, if undefined
-         *   return state.boolean;
-         *   //           ^? boolean
-         * })
-         * ```
-         *
-         * Value passed to selectorFn will be a Proxy - use selector.original(proxy) to get original state value (useful for debugging)
-         *
-         * ```ts
-         * const injectedReducer = rootReducer.inject(booleanSlice);
-         * const selectBoolean = injectedReducer.selector((state) => {
-         *   console.log(injectedReducer.selector.original(state).boolean) // undefined
-         *   return state.boolean
-         * })
-         * ```
-         */
-        <Selector extends (state: DeclaredState, ...args: any[]) => unknown>(selectorFn: Selector): (state: WithOptionalProp<Parameters<Selector>[0], Exclude<keyof DeclaredState, keyof InitialState>>, ...args: Tail<Parameters<Selector>>) => ReturnType<Selector>;
-        /**
-         * Create a selector that guarantees that the slices injected will have a defined value when selector is run.
-         *
-         * ```ts
-         * const selectBooleanWithoutInjection = (state: RootState) => state.boolean;
-         * //                                                                ^? boolean | undefined
-         *
-         * const selectBoolean = rootReducer.inject(booleanSlice).selector((state) => {
-         *   // if action hasn't been dispatched since slice was injected, this would usually be undefined
-         *   // however selector() uses a Proxy around the first parameter to ensure that it evaluates to the initial state instead, if undefined
-         *   return state.boolean;
-         *   //           ^? boolean
-         * })
-         * ```
-         *
-         * If the reducer is nested inside the root state, a selectState callback can be passed to retrieve the reducer's state.
-         *
-         * ```ts
-         *
-         * interface LazyLoadedSlices {};
-         *
-         * const innerReducer = combineSlices(stringSlice).withLazyLoadedSlices<LazyLoadedSlices>();
-         *
-         * const rootReducer = combineSlices({ inner: innerReducer });
-         *
-         * type RootState = ReturnType<typeof rootReducer>;
-         *
-         * // elsewhere
-         *
-         * declare module "./reducer.ts" {
-         *  interface LazyLoadedSlices extends WithSlice<typeof booleanSlice> {}
-         * }
-         *
-         * const withBool = innerReducer.inject(booleanSlice);
-         *
-         * const selectBoolean = withBool.selector(
-         *   (state) => state.boolean,
-         *   (rootState: RootState) => state.inner
-         * );
-         * //    now expects to be passed RootState instead of innerReducer state
-         *
-         * ```
-         *
-         * Value passed to selectorFn will be a Proxy - use selector.original(proxy) to get original state value (useful for debugging)
-         *
-         * ```ts
-         * const injectedReducer = rootReducer.inject(booleanSlice);
-         * const selectBoolean = injectedReducer.selector((state) => {
-         *   console.log(injectedReducer.selector.original(state).boolean) // possibly undefined
-         *   return state.boolean
-         * })
-         * ```
-         */
-        <Selector extends (state: DeclaredState, ...args: any[]) => unknown, RootState>(selectorFn: Selector, selectState: (rootState: RootState, ...args: Tail<Parameters<Selector>>) => WithOptionalProp<Parameters<Selector>[0], Exclude<keyof DeclaredState, keyof InitialState>>): (state: RootState, ...args: Tail<Parameters<Selector>>) => ReturnType<Selector>;
-        /**
-         * Returns the unproxied state. Useful for debugging.
-         * @param state state Proxy, that ensures injected reducers have value
-         * @returns original, unproxied state
-         * @throws if value passed is not a state Proxy
-         */
-        original: (state: DeclaredState) => InitialState & Partial<DeclaredState>;
-    };
-}
-type InitialState<Slices extends Array<AnySliceLike | ReducerMap>> = UnionToIntersection<Slices[number] extends infer Slice ? Slice extends AnySliceLike ? WithSlice<Slice> : StateFromReducersMapObject<Slice> : never>;
-declare function combineSlices<Slices extends Array<AnySliceLike | ReducerMap>>(...slices: Slices): CombinedSliceReducer<Id<InitialState<Slices>>>;
-
-declare const asyncThunkSymbol: unique symbol;
-declare const asyncThunkCreator: {
-    [asyncThunkSymbol]: typeof createAsyncThunk;
-};
-type InjectIntoConfig<NewReducerPath extends string> = InjectConfig & {
-    reducerPath?: NewReducerPath;
-};
-/**
- * The return value of `createSlice`
- *
- * @public
- */
-interface Slice<State = any, CaseReducers extends SliceCaseReducers<State> = SliceCaseReducers<State>, Name extends string = string, ReducerPath extends string = Name, Selectors extends SliceSelectors<State> = SliceSelectors<State>> {
+    baseQuery: BaseQuery;
     /**
-     * The slice name.
-     */
-    name: Name;
-    /**
-     *  The slice reducer path.
-     */
-    reducerPath: ReducerPath;
-    /**
-     * The slice's reducer.
-     */
-    reducer: Reducer<State>;
-    /**
-     * Action creators for the types of actions that are handled by the slice
-     * reducer.
-     */
-    actions: CaseReducerActions<CaseReducers, Name>;
-    /**
-     * The individual case reducer functions that were passed in the `reducers` parameter.
-     * This enables reuse and testing if they were defined inline when calling `createSlice`.
-     */
-    caseReducers: SliceDefinedCaseReducers<CaseReducers>;
-    /**
-     * Provides access to the initial state value given to the slice.
-     * If a lazy state initializer was provided, it will be called and a fresh value returned.
-     */
-    getInitialState: () => State;
-    /**
-     * Get localised slice selectors (expects to be called with *just* the slice's state as the first parameter)
-     */
-    getSelectors(): Id<SliceDefinedSelectors<State, Selectors, State>>;
-    /**
-     * Get globalised slice selectors (`selectState` callback is expected to receive first parameter and return slice state)
-     */
-    getSelectors<RootState>(selectState: (rootState: RootState) => State): Id<SliceDefinedSelectors<State, Selectors, RootState>>;
-    /**
-     * Selectors that assume the slice's state is `rootState[slice.reducerPath]` (which is usually the case)
+     * An array of string tag type names. Specifying tag types is optional, but you should define them so that they can be used for caching and invalidation. When defining a tag type, you will be able to [provide](../../rtk-query/usage/automated-refetching#providing-tags) them with `providesTags` and [invalidate](../../rtk-query/usage/automated-refetching#invalidating-tags) them with `invalidatesTags` when configuring [endpoints](#endpoints).
      *
-     * Equivalent to `slice.getSelectors((state: RootState) => state[slice.reducerPath])`.
-     */
-    get selectors(): Id<SliceDefinedSelectors<State, Selectors, {
-        [K in ReducerPath]: State;
-    }>>;
-    /**
-     * Inject slice into provided reducer (return value from `combineSlices`), and return injected slice.
-     */
-    injectInto<NewReducerPath extends string = ReducerPath>(this: this, injectable: {
-        inject: (slice: {
-            reducerPath: string;
-            reducer: Reducer;
-        }, config?: InjectConfig) => void;
-    }, config?: InjectIntoConfig<NewReducerPath>): InjectedSlice<State, CaseReducers, Name, NewReducerPath, Selectors>;
-    /**
-     * Select the slice state, using the slice's current reducerPath.
+     * @example
      *
-     * Will throw an error if slice is not found.
-     */
-    selectSlice(state: {
-        [K in ReducerPath]: State;
-    }): State;
-}
-/**
- * A slice after being called with `injectInto(reducer)`.
- *
- * Selectors can now be called with an `undefined` value, in which case they use the slice's initial state.
- */
-type InjectedSlice<State = any, CaseReducers extends SliceCaseReducers<State> = SliceCaseReducers<State>, Name extends string = string, ReducerPath extends string = Name, Selectors extends SliceSelectors<State> = SliceSelectors<State>> = Omit<Slice<State, CaseReducers, Name, ReducerPath, Selectors>, 'getSelectors' | 'selectors'> & {
-    /**
-     * Get localised slice selectors (expects to be called with *just* the slice's state as the first parameter)
-     */
-    getSelectors(): Id<SliceDefinedSelectors<State, Selectors, State | undefined>>;
-    /**
-     * Get globalised slice selectors (`selectState` callback is expected to receive first parameter and return slice state)
-     */
-    getSelectors<RootState>(selectState: (rootState: RootState) => State | undefined): Id<SliceDefinedSelectors<State, Selectors, RootState>>;
-    /**
-     * Selectors that assume the slice's state is `rootState[slice.name]` (which is usually the case)
+     * ```ts
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
      *
-     * Equivalent to `slice.getSelectors((state: RootState) => state[slice.name])`.
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   // highlight-start
+     *   tagTypes: ['Post', 'User'],
+     *   // highlight-end
+     *   endpoints: (build) => ({
+     *     // ...endpoints
+     *   }),
+     * })
+     * ```
      */
-    get selectors(): Id<SliceDefinedSelectors<State, Selectors, {
-        [K in ReducerPath]?: State | undefined;
-    }>>;
+    tagTypes?: readonly TagTypes[];
     /**
-     * Select the slice state, using the slice's current reducerPath.
+     * The `reducerPath` is a _unique_ key that your service will be mounted to in your store. If you call `createApi` more than once in your application, you will need to provide a unique value each time. Defaults to `'api'`.
      *
-     * Returns initial state if slice is not found.
-     */
-    selectSlice(state: {
-        [K in ReducerPath]?: State | undefined;
-    }): State;
-};
-/**
- * Options for `createSlice()`.
- *
- * @public
- */
-interface CreateSliceOptions<State = any, CR extends SliceCaseReducers<State> = SliceCaseReducers<State>, Name extends string = string, ReducerPath extends string = Name, Selectors extends SliceSelectors<State> = SliceSelectors<State>> {
-    /**
-     * The slice's name. Used to namespace the generated action types.
-     */
-    name: Name;
-    /**
-     * The slice's reducer path. Used when injecting into a combined slice reducer.
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="apis.js"
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query';
+     *
+     * const apiOne = createApi({
+     *   // highlight-start
+     *   reducerPath: 'apiOne',
+     *   // highlight-end
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (builder) => ({
+     *     // ...endpoints
+     *   }),
+     * });
+     *
+     * const apiTwo = createApi({
+     *   // highlight-start
+     *   reducerPath: 'apiTwo',
+     *   // highlight-end
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (builder) => ({
+     *     // ...endpoints
+     *   }),
+     * });
+     * ```
      */
     reducerPath?: ReducerPath;
     /**
-     * The initial state that should be used when the reducer is called the first time. This may also be a "lazy initializer" function, which should return an initial state value when called. This will be used whenever the reducer is called with `undefined` as its state value, and is primarily useful for cases like reading initial state from `localStorage`.
+     * Accepts a custom function if you have a need to change the creation of cache keys for any reason.
      */
-    initialState: State | (() => State);
+    serializeQueryArgs?: SerializeQueryArgs<unknown>;
     /**
-     * A mapping from action types to action-type-specific *case reducer*
-     * functions. For every action type, a matching action creator will be
-     * generated using `createAction()`.
+     * Endpoints are a set of operations that you want to perform against your server. You define them as an object using the builder syntax. There are three endpoint types: [`query`](../../rtk-query/usage/queries), [`infiniteQuery`](../../rtk-query/usage/infinite-queries) and [`mutation`](../../rtk-query/usage/mutations).
      */
-    reducers: ValidateSliceCaseReducers<State, CR> | ((creators: ReducerCreators<State>) => CR);
+    endpoints(build: EndpointBuilder<BaseQuery, TagTypes, ReducerPath>): Definitions;
     /**
-     * A callback that receives a *builder* object to define
-     * case reducers via calls to `builder.addCase(actionCreatorOrType, reducer)`.
-     *
+     * Defaults to `60` _(this value is in seconds)_. This is how long RTK Query will keep your data cached for **after** the last component unsubscribes. For example, if you query an endpoint, then unmount the component, then mount another component that makes the same request within the given time frame, the most recent value will be served from the cache.
      *
      * @example
-  ```ts
-  import { createAction, createSlice, Action } from '@reduxjs/toolkit'
-  const incrementBy = createAction<number>('incrementBy')
-  const decrement = createAction('decrement')
-  
-  interface RejectedAction extends Action {
-    error: Error
-  }
-  
-  function isRejectedAction(action: Action): action is RejectedAction {
-    return action.type.endsWith('rejected')
-  }
-  
-  createSlice({
-    name: 'counter',
-    initialState: 0,
-    reducers: {},
-    extraReducers: builder => {
-      builder
-        .addCase(incrementBy, (state, action) => {
-          // action is inferred correctly here if using TS
-        })
-        // You can chain calls, or have separate `builder.addCase()` lines each time
-        .addCase(decrement, (state, action) => {})
-        // You can match a range of action types
-        .addMatcher(
-          isRejectedAction,
-          // `action` will be inferred as a RejectedAction due to isRejectedAction being defined as a type guard
-          (state, action) => {}
-        )
-        // and provide a default case if no other handlers matched
-        .addDefaultCase((state, action) => {})
-      }
-  })
-  ```
-     */
-    extraReducers?: (builder: ActionReducerMapBuilder<State>) => void;
-    /**
-     * A map of selectors that receive the slice's state and any additional arguments, and return a result.
-     */
-    selectors?: Selectors;
-}
-declare enum ReducerType {
-    reducer = "reducer",
-    reducerWithPrepare = "reducerWithPrepare",
-    asyncThunk = "asyncThunk"
-}
-type ReducerDefinition<T extends ReducerType = ReducerType> = {
-    _reducerDefinitionType: T;
-};
-type CaseReducerDefinition<S = any, A extends Action = UnknownAction> = CaseReducer<S, A> & ReducerDefinition<ReducerType.reducer>;
-/**
- * A CaseReducer with a `prepare` method.
- *
- * @public
- */
-type CaseReducerWithPrepare<State, Action extends PayloadAction> = {
-    reducer: CaseReducer<State, Action>;
-    prepare: PrepareAction<Action['payload']>;
-};
-type AsyncThunkSliceReducerConfig<State, ThunkArg extends any, Returned = unknown, ThunkApiConfig extends AsyncThunkConfig = {}> = AsyncThunkReducers<State, ThunkArg, Returned, ThunkApiConfig> & {
-    options?: AsyncThunkOptions<ThunkArg, ThunkApiConfig>;
-};
-type AsyncThunkSliceReducerDefinition<State, ThunkArg extends any, Returned = unknown, ThunkApiConfig extends AsyncThunkConfig = {}> = AsyncThunkSliceReducerConfig<State, ThunkArg, Returned, ThunkApiConfig> & ReducerDefinition<ReducerType.asyncThunk> & {
-    payloadCreator: AsyncThunkPayloadCreator<Returned, ThunkArg, ThunkApiConfig>;
-};
-/**
- * Providing these as part of the config would cause circular types, so we disallow passing them
- */
-type PreventCircular<ThunkApiConfig> = {
-    [K in keyof ThunkApiConfig]: K extends 'state' | 'dispatch' ? never : ThunkApiConfig[K];
-};
-interface AsyncThunkCreator<State, CurriedThunkApiConfig extends PreventCircular<AsyncThunkConfig> = PreventCircular<AsyncThunkConfig>> {
-    <Returned, ThunkArg = void>(payloadCreator: AsyncThunkPayloadCreator<Returned, ThunkArg, CurriedThunkApiConfig>, config?: AsyncThunkSliceReducerConfig<State, ThunkArg, Returned, CurriedThunkApiConfig>): AsyncThunkSliceReducerDefinition<State, ThunkArg, Returned, CurriedThunkApiConfig>;
-    <Returned, ThunkArg, ThunkApiConfig extends PreventCircular<AsyncThunkConfig> = {}>(payloadCreator: AsyncThunkPayloadCreator<Returned, ThunkArg, ThunkApiConfig>, config?: AsyncThunkSliceReducerConfig<State, ThunkArg, Returned, ThunkApiConfig>): AsyncThunkSliceReducerDefinition<State, ThunkArg, Returned, ThunkApiConfig>;
-    withTypes<ThunkApiConfig extends PreventCircular<AsyncThunkConfig>>(): AsyncThunkCreator<State, OverrideThunkApiConfigs<CurriedThunkApiConfig, ThunkApiConfig>>;
-}
-interface ReducerCreators<State> {
-    reducer(caseReducer: CaseReducer<State, PayloadAction>): CaseReducerDefinition<State, PayloadAction>;
-    reducer<Payload>(caseReducer: CaseReducer<State, PayloadAction<Payload>>): CaseReducerDefinition<State, PayloadAction<Payload>>;
-    asyncThunk: AsyncThunkCreator<State>;
-    preparedReducer<Prepare extends PrepareAction<any>>(prepare: Prepare, reducer: CaseReducer<State, ReturnType<_ActionCreatorWithPreparedPayload<Prepare>>>): {
-        _reducerDefinitionType: ReducerType.reducerWithPrepare;
-        prepare: Prepare;
-        reducer: CaseReducer<State, ReturnType<_ActionCreatorWithPreparedPayload<Prepare>>>;
-    };
-}
-/**
- * The type describing a slice's `reducers` option.
- *
- * @public
- */
-type SliceCaseReducers<State> = Record<string, ReducerDefinition> | Record<string, CaseReducer<State, PayloadAction<any>> | CaseReducerWithPrepare<State, PayloadAction<any, string, any, any>>>;
-/**
- * The type describing a slice's `selectors` option.
- */
-type SliceSelectors<State> = {
-    [K: string]: (sliceState: State, ...args: any[]) => any;
-};
-type SliceActionType<SliceName extends string, ActionName extends keyof any> = ActionName extends string | number ? `${SliceName}/${ActionName}` : string;
-/**
- * Derives the slice's `actions` property from the `reducers` options
- *
- * @public
- */
-type CaseReducerActions<CaseReducers extends SliceCaseReducers<any>, SliceName extends string> = {
-    [Type in keyof CaseReducers]: CaseReducers[Type] extends infer Definition ? Definition extends {
-        prepare: any;
-    } ? ActionCreatorForCaseReducerWithPrepare<Definition, SliceActionType<SliceName, Type>> : Definition extends AsyncThunkSliceReducerDefinition<any, infer ThunkArg, infer Returned, infer ThunkApiConfig> ? AsyncThunk<Returned, ThunkArg, ThunkApiConfig> : Definition extends {
-        reducer: any;
-    } ? ActionCreatorForCaseReducer<Definition['reducer'], SliceActionType<SliceName, Type>> : ActionCreatorForCaseReducer<Definition, SliceActionType<SliceName, Type>> : never;
-};
-/**
- * Get a `PayloadActionCreator` type for a passed `CaseReducerWithPrepare`
- *
- * @internal
- */
-type ActionCreatorForCaseReducerWithPrepare<CR extends {
-    prepare: any;
-}, Type extends string> = _ActionCreatorWithPreparedPayload<CR['prepare'], Type>;
-/**
- * Get a `PayloadActionCreator` type for a passed `CaseReducer`
- *
- * @internal
- */
-type ActionCreatorForCaseReducer<CR, Type extends string> = CR extends (state: any, action: infer Action) => any ? Action extends {
-    payload: infer P;
-} ? PayloadActionCreator<P, Type> : ActionCreatorWithoutPayload<Type> : ActionCreatorWithoutPayload<Type>;
-/**
- * Extracts the CaseReducers out of a `reducers` object, even if they are
- * tested into a `CaseReducerWithPrepare`.
- *
- * @internal
- */
-type SliceDefinedCaseReducers<CaseReducers extends SliceCaseReducers<any>> = {
-    [Type in keyof CaseReducers]: CaseReducers[Type] extends infer Definition ? Definition extends AsyncThunkSliceReducerDefinition<any, any, any> ? Id<Pick<Required<Definition>, 'fulfilled' | 'rejected' | 'pending' | 'settled'>> : Definition extends {
-        reducer: infer Reducer;
-    } ? Reducer : Definition : never;
-};
-type RemappedSelector<S extends Selector, NewState> = S extends Selector<any, infer R, infer P> ? Selector<NewState, R, P> & {
-    unwrapped: S;
-} : never;
-/**
- * Extracts the final selector type from the `selectors` object.
- *
- * Removes the `string` index signature from the default value.
- */
-type SliceDefinedSelectors<State, Selectors extends SliceSelectors<State>, RootState> = {
-    [K in keyof Selectors as string extends K ? never : K]: RemappedSelector<Selectors[K], RootState>;
-};
-/**
- * Used on a SliceCaseReducers object.
- * Ensures that if a CaseReducer is a `CaseReducerWithPrepare`, that
- * the `reducer` and the `prepare` function use the same type of `payload`.
- *
- * Might do additional such checks in the future.
- *
- * This type is only ever useful if you want to write your own wrapper around
- * `createSlice`. Please don't use it otherwise!
- *
- * @public
- */
-type ValidateSliceCaseReducers<S, ACR extends SliceCaseReducers<S>> = ACR & {
-    [T in keyof ACR]: ACR[T] extends {
-        reducer(s: S, action?: infer A): any;
-    } ? {
-        prepare(...a: never[]): Omit<A, 'type'>;
-    } : {};
-};
-interface BuildCreateSliceConfig {
-    creators?: {
-        asyncThunk?: typeof asyncThunkCreator;
-    };
-}
-declare function buildCreateSlice({ creators }?: BuildCreateSliceConfig): <State, CaseReducers extends SliceCaseReducers<State>, Name extends string, Selectors extends SliceSelectors<State>, ReducerPath extends string = Name>(options: CreateSliceOptions<State, CaseReducers, Name, ReducerPath, Selectors>) => Slice<State, CaseReducers, Name, ReducerPath, Selectors>;
-/**
- * A function that accepts an initial state, an object full of reducer
- * functions, and a "slice name", and automatically generates
- * action creators and action types that correspond to the
- * reducers and state.
- *
- * @public
- */
-declare const createSlice: <State, CaseReducers extends SliceCaseReducers<State>, Name extends string, Selectors extends SliceSelectors<State>, ReducerPath extends string = Name>(options: CreateSliceOptions<State, CaseReducers, Name, ReducerPath, Selectors>) => Slice<State, CaseReducers, Name, ReducerPath, Selectors>;
-
-type AnyFunction = (...args: any) => any;
-type AnyCreateSelectorFunction = CreateSelectorFunction<(<F extends AnyFunction>(f: F) => F), <F extends AnyFunction>(f: F) => F>;
-type GetSelectorsOptions = {
-    createSelector?: AnyCreateSelectorFunction;
-};
-
-/**
- * @public
- */
-type EntityId = number | string;
-/**
- * @public
- */
-type Comparer<T> = (a: T, b: T) => number;
-/**
- * @public
- */
-type IdSelector<T, Id extends EntityId> = (model: T) => Id;
-/**
- * @public
- */
-type Update<T, Id extends EntityId> = {
-    id: Id;
-    changes: Partial<T>;
-};
-/**
- * @public
- */
-interface EntityState<T, Id extends EntityId> {
-    ids: Id[];
-    entities: Record<Id, T>;
-}
-/**
- * @public
- */
-interface EntityAdapterOptions<T, Id extends EntityId> {
-    selectId?: IdSelector<T, Id>;
-    sortComparer?: false | Comparer<T>;
-}
-type PreventAny<S, T, Id extends EntityId> = CastAny<S, EntityState<T, Id>>;
-type DraftableEntityState<T, Id extends EntityId> = EntityState<T, Id> | Draft<EntityState<T, Id>>;
-/**
- * @public
- */
-interface EntityStateAdapter<T, Id extends EntityId> {
-    addOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entity: T): S;
-    addOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, action: PayloadAction<T>): S;
-    addMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: readonly T[] | Record<Id, T>): S;
-    addMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: PayloadAction<readonly T[] | Record<Id, T>>): S;
-    setOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entity: T): S;
-    setOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, action: PayloadAction<T>): S;
-    setMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: readonly T[] | Record<Id, T>): S;
-    setMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: PayloadAction<readonly T[] | Record<Id, T>>): S;
-    setAll<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: readonly T[] | Record<Id, T>): S;
-    setAll<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: PayloadAction<readonly T[] | Record<Id, T>>): S;
-    removeOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, key: Id): S;
-    removeOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, key: PayloadAction<Id>): S;
-    removeMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, keys: readonly Id[]): S;
-    removeMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, keys: PayloadAction<readonly Id[]>): S;
-    removeAll<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>): S;
-    updateOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, update: Update<T, Id>): S;
-    updateOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, update: PayloadAction<Update<T, Id>>): S;
-    updateMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, updates: ReadonlyArray<Update<T, Id>>): S;
-    updateMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, updates: PayloadAction<ReadonlyArray<Update<T, Id>>>): S;
-    upsertOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entity: T): S;
-    upsertOne<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entity: PayloadAction<T>): S;
-    upsertMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: readonly T[] | Record<Id, T>): S;
-    upsertMany<S extends DraftableEntityState<T, Id>>(state: PreventAny<S, T, Id>, entities: PayloadAction<readonly T[] | Record<Id, T>>): S;
-}
-/**
- * @public
- */
-interface EntitySelectors<T, V, IdType extends EntityId> {
-    selectIds: (state: V) => IdType[];
-    selectEntities: (state: V) => Record<IdType, T>;
-    selectAll: (state: V) => T[];
-    selectTotal: (state: V) => number;
-    selectById: (state: V, id: IdType) => Id<UncheckedIndexedAccess<T>>;
-}
-/**
- * @public
- */
-interface EntityStateFactory<T, Id extends EntityId> {
-    getInitialState(state?: undefined, entities?: Record<Id, T> | readonly T[]): EntityState<T, Id>;
-    getInitialState<S extends object>(state: S, entities?: Record<Id, T> | readonly T[]): EntityState<T, Id> & S;
-}
-/**
- * @public
- */
-interface EntityAdapter<T, Id extends EntityId> extends EntityStateAdapter<T, Id>, EntityStateFactory<T, Id>, Required<EntityAdapterOptions<T, Id>> {
-    getSelectors(selectState?: undefined, options?: GetSelectorsOptions): EntitySelectors<T, EntityState<T, Id>, Id>;
-    getSelectors<V>(selectState: (state: V) => EntityState<T, Id>, options?: GetSelectorsOptions): EntitySelectors<T, V, Id>;
-}
-
-declare function createEntityAdapter<T, Id extends EntityId>(options: WithRequiredProp<EntityAdapterOptions<T, Id>, 'selectId'>): EntityAdapter<T, Id>;
-declare function createEntityAdapter<T extends {
-    id: EntityId;
-}>(options?: Omit<EntityAdapterOptions<T, T['id']>, 'selectId'>): EntityAdapter<T, T['id']>;
-
-/** @public */
-type ActionMatchingAnyOf<Matchers extends Matcher<any>[]> = ActionFromMatcher<Matchers[number]>;
-/** @public */
-type ActionMatchingAllOf<Matchers extends Matcher<any>[]> = UnionToIntersection<ActionMatchingAnyOf<Matchers>>;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action matches any one of the supplied type guards or action
- * creators.
- *
- * @param matchers The type guards or action creators to match against.
- *
- * @public
- */
-declare function isAnyOf<Matchers extends Matcher<any>[]>(...matchers: Matchers): (action: any) => action is ActionMatchingAnyOf<Matchers>;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action matches all of the supplied type guards or action
- * creators.
- *
- * @param matchers The type guards or action creators to match against.
- *
- * @public
- */
-declare function isAllOf<Matchers extends Matcher<any>[]>(...matchers: Matchers): (action: any) => action is ActionMatchingAllOf<Matchers>;
-type UnknownAsyncThunkPendingAction = ReturnType<AsyncThunkPendingActionCreator<unknown>>;
-type PendingActionFromAsyncThunk<T extends AnyAsyncThunk> = ActionFromMatcher<T['pending']>;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action was created by an async thunk action creator, and that
- * the action is pending.
- *
- * @public
- */
-declare function isPending(): (action: any) => action is UnknownAsyncThunkPendingAction;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action belongs to one of the provided async thunk action creators,
- * and that the action is pending.
- *
- * @param asyncThunks (optional) The async thunk action creators to match against.
- *
- * @public
- */
-declare function isPending<AsyncThunks extends [AnyAsyncThunk, ...AnyAsyncThunk[]]>(...asyncThunks: AsyncThunks): (action: any) => action is PendingActionFromAsyncThunk<AsyncThunks[number]>;
-/**
- * Tests if `action` is a pending thunk action
- * @public
- */
-declare function isPending(action: any): action is UnknownAsyncThunkPendingAction;
-type UnknownAsyncThunkRejectedAction = ReturnType<AsyncThunkRejectedActionCreator<unknown, unknown>>;
-type RejectedActionFromAsyncThunk<T extends AnyAsyncThunk> = ActionFromMatcher<T['rejected']>;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action was created by an async thunk action creator, and that
- * the action is rejected.
- *
- * @public
- */
-declare function isRejected(): (action: any) => action is UnknownAsyncThunkRejectedAction;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action belongs to one of the provided async thunk action creators,
- * and that the action is rejected.
- *
- * @param asyncThunks (optional) The async thunk action creators to match against.
- *
- * @public
- */
-declare function isRejected<AsyncThunks extends [AnyAsyncThunk, ...AnyAsyncThunk[]]>(...asyncThunks: AsyncThunks): (action: any) => action is RejectedActionFromAsyncThunk<AsyncThunks[number]>;
-/**
- * Tests if `action` is a rejected thunk action
- * @public
- */
-declare function isRejected(action: any): action is UnknownAsyncThunkRejectedAction;
-type RejectedWithValueActionFromAsyncThunk<T extends AnyAsyncThunk> = ActionFromMatcher<T['rejected']> & (T extends AsyncThunk<any, any, {
-    rejectValue: infer RejectedValue;
-}> ? {
-    payload: RejectedValue;
-} : unknown);
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action was created by an async thunk action creator, and that
- * the action is rejected with value.
- *
- * @public
- */
-declare function isRejectedWithValue(): (action: any) => action is UnknownAsyncThunkRejectedAction;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action belongs to one of the provided async thunk action creators,
- * and that the action is rejected with value.
- *
- * @param asyncThunks (optional) The async thunk action creators to match against.
- *
- * @public
- */
-declare function isRejectedWithValue<AsyncThunks extends [AnyAsyncThunk, ...AnyAsyncThunk[]]>(...asyncThunks: AsyncThunks): (action: any) => action is RejectedWithValueActionFromAsyncThunk<AsyncThunks[number]>;
-/**
- * Tests if `action` is a rejected thunk action with value
- * @public
- */
-declare function isRejectedWithValue(action: any): action is UnknownAsyncThunkRejectedAction;
-type UnknownAsyncThunkFulfilledAction = ReturnType<AsyncThunkFulfilledActionCreator<unknown, unknown>>;
-type FulfilledActionFromAsyncThunk<T extends AnyAsyncThunk> = ActionFromMatcher<T['fulfilled']>;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action was created by an async thunk action creator, and that
- * the action is fulfilled.
- *
- * @public
- */
-declare function isFulfilled(): (action: any) => action is UnknownAsyncThunkFulfilledAction;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action belongs to one of the provided async thunk action creators,
- * and that the action is fulfilled.
- *
- * @param asyncThunks (optional) The async thunk action creators to match against.
- *
- * @public
- */
-declare function isFulfilled<AsyncThunks extends [AnyAsyncThunk, ...AnyAsyncThunk[]]>(...asyncThunks: AsyncThunks): (action: any) => action is FulfilledActionFromAsyncThunk<AsyncThunks[number]>;
-/**
- * Tests if `action` is a fulfilled thunk action
- * @public
- */
-declare function isFulfilled(action: any): action is UnknownAsyncThunkFulfilledAction;
-type UnknownAsyncThunkAction = UnknownAsyncThunkPendingAction | UnknownAsyncThunkRejectedAction | UnknownAsyncThunkFulfilledAction;
-type AnyAsyncThunk = {
-    pending: {
-        match: (action: any) => action is any;
-    };
-    fulfilled: {
-        match: (action: any) => action is any;
-    };
-    rejected: {
-        match: (action: any) => action is any;
-    };
-};
-type ActionsFromAsyncThunk<T extends AnyAsyncThunk> = ActionFromMatcher<T['pending']> | ActionFromMatcher<T['fulfilled']> | ActionFromMatcher<T['rejected']>;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action was created by an async thunk action creator.
- *
- * @public
- */
-declare function isAsyncThunkAction(): (action: any) => action is UnknownAsyncThunkAction;
-/**
- * A higher-order function that returns a function that may be used to check
- * whether an action belongs to one of the provided async thunk action creators.
- *
- * @param asyncThunks (optional) The async thunk action creators to match against.
- *
- * @public
- */
-declare function isAsyncThunkAction<AsyncThunks extends [AnyAsyncThunk, ...AnyAsyncThunk[]]>(...asyncThunks: AsyncThunks): (action: any) => action is ActionsFromAsyncThunk<AsyncThunks[number]>;
-/**
- * Tests if `action` is a thunk action
- * @public
- */
-declare function isAsyncThunkAction(action: any): action is UnknownAsyncThunkAction;
-
-/**
- *
- * @public
- */
-declare let nanoid: (size?: number) => string;
-
-declare class TaskAbortError implements SerializedError {
-    code: string | undefined;
-    name: string;
-    message: string;
-    constructor(code: string | undefined);
-}
-
-/**
- * Types copied from RTK
- */
-/** @internal */
-type TypedActionCreatorWithMatchFunction<Type extends string> = TypedActionCreator<Type> & {
-    match: MatchFunction<any>;
-};
-/** @internal */
-type AnyListenerPredicate<State> = (action: UnknownAction, currentState: State, originalState: State) => boolean;
-/** @public */
-type ListenerPredicate<ActionType extends Action, State> = (action: UnknownAction, currentState: State, originalState: State) => action is ActionType;
-/** @public */
-interface ConditionFunction<State> {
-    (predicate: AnyListenerPredicate<State>, timeout?: number): Promise<boolean>;
-    (predicate: AnyListenerPredicate<State>, timeout?: number): Promise<boolean>;
-    (predicate: () => boolean, timeout?: number): Promise<boolean>;
-}
-/** @internal */
-type MatchFunction<T> = (v: any) => v is T;
-/** @public */
-interface ForkedTaskAPI {
-    /**
-     * Returns a promise that resolves when `waitFor` resolves or
-     * rejects if the task or the parent listener has been cancelled or is completed.
-     */
-    pause<W>(waitFor: Promise<W>): Promise<W>;
-    /**
-     * Returns a promise that resolves after `timeoutMs` or
-     * rejects if the task or the parent listener has been cancelled or is completed.
-     * @param timeoutMs
-     */
-    delay(timeoutMs: number): Promise<void>;
-    /**
-     * An abort signal whose `aborted` property is set to `true`
-     * if the task execution is either aborted or completed.
-     * @see https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal
-     */
-    signal: AbortSignal;
-}
-/** @public */
-interface AsyncTaskExecutor<T> {
-    (forkApi: ForkedTaskAPI): Promise<T>;
-}
-/** @public */
-interface SyncTaskExecutor<T> {
-    (forkApi: ForkedTaskAPI): T;
-}
-/** @public */
-type ForkedTaskExecutor<T> = AsyncTaskExecutor<T> | SyncTaskExecutor<T>;
-/** @public */
-type TaskResolved<T> = {
-    readonly status: 'ok';
-    readonly value: T;
-};
-/** @public */
-type TaskRejected = {
-    readonly status: 'rejected';
-    readonly error: unknown;
-};
-/** @public */
-type TaskCancelled = {
-    readonly status: 'cancelled';
-    readonly error: TaskAbortError;
-};
-/** @public */
-type TaskResult<Value> = TaskResolved<Value> | TaskRejected | TaskCancelled;
-/** @public */
-interface ForkedTask<T> {
-    /**
-     * A promise that resolves when the task is either completed or cancelled or rejects
-     * if parent listener execution is cancelled or completed.
-     *
-     * ### Example
      * ```ts
-     * const result = await fork(async (forkApi) => Promise.resolve(4)).result
+     * // codeblock-meta title="keepUnusedDataFor example"
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     * type PostsResponse = Post[]
      *
-     * if(result.status === 'ok') {
-     *   console.log(result.value) // logs 4
-     * }}
-     * ```
-     */
-    result: Promise<TaskResult<T>>;
-    /**
-     * Cancel task if it is in progress or not yet started,
-     * it is noop otherwise.
-     */
-    cancel(): void;
-}
-/** @public */
-interface ForkOptions {
-    /**
-     * If true, causes the parent task to not be marked as complete until
-     * all autoJoined forks have completed or failed.
-     */
-    autoJoin: boolean;
-}
-/** @public */
-interface ListenerEffectAPI<State, DispatchType extends Dispatch, ExtraArgument = unknown> extends MiddlewareAPI<DispatchType, State> {
-    /**
-     * Returns the store state as it existed when the action was originally dispatched, _before_ the reducers ran.
-     *
-     * ### Synchronous invocation
-     *
-     * This function can **only** be invoked **synchronously**, it throws error otherwise.
-     *
-     * @example
-     *
-     * ```ts
-     * middleware.startListening({
-     *  predicate: () => true,
-     *  async effect(_, { getOriginalState }) {
-     *    getOriginalState(); // sync: OK!
-     *
-     *    setTimeout(getOriginalState, 0); // async: throws Error
-     *
-     *    await Promise().resolve();
-     *
-     *    getOriginalState() // async: throws Error
-     *  }
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPosts: build.query<PostsResponse, void>({
+     *       query: () => 'posts'
+     *     })
+     *   }),
+     *   // highlight-start
+     *   keepUnusedDataFor: 5
+     *   // highlight-end
      * })
      * ```
      */
-    getOriginalState: () => State;
+    keepUnusedDataFor?: number;
     /**
-     * Removes the listener entry from the middleware and prevent future instances of the listener from running.
+     * Defaults to `false`. This setting allows you to control whether if a cached result is already available RTK Query will only serve a cached result, or if it should `refetch` when set to `true` or if an adequate amount of time has passed since the last successful query result.
+     * - `false` - Will not cause a query to be performed _unless_ it does not exist yet.
+     * - `true` - Will always refetch when a new subscriber to a query is added. Behaves the same as calling the `refetch` callback or passing `forceRefetch: true` in the action creator.
+     * - `number` - **Value is in seconds**. If a number is provided and there is an existing query in the cache, it will compare the current time vs the last fulfilled timestamp, and only refetch if enough time has elapsed.
      *
-     * It does **not** cancel any active instances.
+     * If you specify this option alongside `skip: true`, this **will not be evaluated** until `skip` is false.
      */
+    refetchOnMountOrArgChange?: boolean | number;
+    /**
+     * Defaults to `false`. This setting allows you to control whether RTK Query will try to refetch all subscribed queries after the application window regains focus.
+     *
+     * If you specify this option alongside `skip: true`, this **will not be evaluated** until `skip` is false.
+     *
+     * Note: requires [`setupListeners`](./setupListeners) to have been called.
+     */
+    refetchOnFocus?: boolean;
+    /**
+     * Defaults to `false`. This setting allows you to control whether RTK Query will try to refetch all subscribed queries after regaining a network connection.
+     *
+     * If you specify this option alongside `skip: true`, this **will not be evaluated** until `skip` is false.
+     *
+     * Note: requires [`setupListeners`](./setupListeners) to have been called.
+     */
+    refetchOnReconnect?: boolean;
+    /**
+     * Defaults to `'delayed'`. This setting allows you to control when tags are invalidated after a mutation.
+     *
+     * - `'immediately'`: Queries are invalidated instantly after the mutation finished, even if they are running.
+     *   If the query provides tags that were invalidated while it ran, it won't be re-fetched.
+     * - `'delayed'`: Invalidation only happens after all queries and mutations are settled.
+     *   This ensures that queries are always invalidated correctly and automatically "batches" invalidations of concurrent mutations.
+     *   Note that if you constantly have some queries (or mutations) running, this can delay tag invalidations indefinitely.
+     */
+    invalidationBehavior?: 'delayed' | 'immediately';
+    /**
+     * A function that is passed every dispatched action. If this returns something other than `undefined`,
+     * that return value will be used to rehydrate fulfilled & errored queries.
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="next-redux-wrapper rehydration example"
+     * import type { Action, PayloadAction } from '@reduxjs/toolkit'
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * import { HYDRATE } from 'next-redux-wrapper'
+     *
+     * type RootState = any; // normally inferred from state
+     *
+     * function isHydrateAction(action: Action): action is PayloadAction<RootState> {
+     *   return action.type === HYDRATE
+     * }
+     *
+     * export const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   // highlight-start
+     *   extractRehydrationInfo(action, { reducerPath }): any {
+     *     if (isHydrateAction(action)) {
+     *       return action.payload[reducerPath]
+     *     }
+     *   },
+     *   // highlight-end
+     *   endpoints: (build) => ({
+     *     // omitted
+     *   }),
+     * })
+     * ```
+     */
+    extractRehydrationInfo?: (action: UnknownAction, { reducerPath, }: {
+        reducerPath: ReducerPath;
+    }) => undefined | CombinedState<NoInfer<Definitions>, NoInfer<TagTypes>, NoInfer<ReducerPath>>;
+    /**
+     * A function that is called when a schema validation fails.
+     *
+     * Gets called with a `NamedSchemaError` and an object containing the endpoint name, the type of the endpoint, the argument passed to the endpoint, and the query cache key (if applicable).
+     *
+     * `NamedSchemaError` has the following properties:
+     * - `issues`: an array of issues that caused the validation to fail
+     * - `value`: the value that was passed to the schema
+     * - `schemaName`: the name of the schema that was used to validate the value (e.g. `argSchema`)
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *     }),
+     *   }),
+     *   onSchemaFailure: (error, info) => {
+     *     console.error(error, info)
+     *   },
+     * })
+     * ```
+     */
+    onSchemaFailure?: SchemaFailureHandler;
+    /**
+     * Convert a schema validation failure into an error shape matching base query errors.
+     *
+     * When not provided, schema failures are treated as fatal, and normal error handling such as tag invalidation will not be executed.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       responseSchema: v.object({ id: v.number(), name: v.string() }),
+     *     }),
+     *   }),
+     *   catchSchemaFailure: (error, info) => ({
+     *     status: "CUSTOM_ERROR",
+     *     error: error.schemaName + " failed validation",
+     *     data: error.issues,
+     *   }),
+     * })
+     * ```
+     */
+    catchSchemaFailure?: SchemaFailureConverter<BaseQuery>;
+    /**
+     * Defaults to `false`.
+     *
+     * If set to `true`, will skip schema validation for all endpoints, unless overridden by the endpoint.
+     *
+     * Can be overridden for specific schemas by passing an array of schema types to skip.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   skipSchemaValidation: process.env.NODE_ENV === "test" ? ["response"] : false, // skip schema validation for response in tests, since we'll be mocking the response
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       responseSchema: v.object({ id: v.number(), name: v.string() }),
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    skipSchemaValidation?: boolean | SchemaType[];
+}
+type CreateApi<Modules extends ModuleName> = {
+    /**
+     * Creates a service to use in your application. Contains only the basic redux logic (the core module).
+     *
+     * @link https://redux-toolkit.js.org/rtk-query/api/createApi
+     */
+    <BaseQuery extends BaseQueryFn, Definitions extends EndpointDefinitions, ReducerPath extends string = 'api', TagTypes extends string = never>(options: CreateApiOptions<BaseQuery, Definitions, ReducerPath, TagTypes>): Api<BaseQuery, Definitions, ReducerPath, TagTypes, Modules>;
+};
+/**
+ * Builds a `createApi` method based on the provided `modules`.
+ *
+ * @link https://redux-toolkit.js.org/rtk-query/usage/customizing-create-api
+ *
+ * @example
+ * ```ts
+ * const MyContext = React.createContext<ReactReduxContextValue | null>(null);
+ * const customCreateApi = buildCreateApi(
+ *   coreModule(),
+ *   reactHooksModule({
+ *     hooks: {
+ *       useDispatch: createDispatchHook(MyContext),
+ *       useSelector: createSelectorHook(MyContext),
+ *       useStore: createStoreHook(MyContext)
+ *     }
+ *   })
+ * );
+ * ```
+ *
+ * @param modules - A variable number of modules that customize how the `createApi` method handles endpoints
+ * @returns A `createApi` method using the provided `modules`.
+ */
+declare function buildCreateApi<Modules extends [Module<any>, ...Module<any>[]]>(...modules: Modules): CreateApi<Modules[number]['name']>;
+
+type BuildThunksApiEndpointQuery<Definition extends QueryDefinition<any, any, any, any, any>> = Matchers<QueryThunk, Definition>;
+type BuildThunksApiEndpointInfiniteQuery<Definition extends InfiniteQueryDefinition<any, any, any, any, any>> = Matchers<InfiniteQueryThunk<any>, Definition>;
+type BuildThunksApiEndpointMutation<Definition extends MutationDefinition<any, any, any, any, any>> = Matchers<MutationThunk, Definition>;
+type EndpointThunk<Thunk extends QueryThunk | MutationThunk | InfiniteQueryThunk<any>, Definition extends EndpointDefinition<any, any, any, any>> = Definition extends EndpointDefinition<infer QueryArg, infer BaseQueryFn, any, infer ResultType> ? Thunk extends AsyncThunk<unknown, infer ATArg, infer ATConfig> ? AsyncThunk<ResultType, ATArg & {
+    originalArgs: QueryArg;
+}, ATConfig & {
+    rejectValue: BaseQueryError<BaseQueryFn>;
+}> : never : Definition extends InfiniteQueryDefinition<infer QueryArg, infer PageParam, infer BaseQueryFn, any, infer ResultType> ? Thunk extends AsyncThunk<unknown, infer ATArg, infer ATConfig> ? AsyncThunk<InfiniteData<ResultType, PageParam>, ATArg & {
+    originalArgs: QueryArg;
+}, ATConfig & {
+    rejectValue: BaseQueryError<BaseQueryFn>;
+}> : never : never;
+type PendingAction<Thunk extends QueryThunk | MutationThunk | InfiniteQueryThunk<any>, Definition extends EndpointDefinition<any, any, any, any>> = ReturnType<EndpointThunk<Thunk, Definition>['pending']>;
+type FulfilledAction<Thunk extends QueryThunk | MutationThunk | InfiniteQueryThunk<any>, Definition extends EndpointDefinition<any, any, any, any>> = ReturnType<EndpointThunk<Thunk, Definition>['fulfilled']>;
+type RejectedAction<Thunk extends QueryThunk | MutationThunk | InfiniteQueryThunk<any>, Definition extends EndpointDefinition<any, any, any, any>> = ReturnType<EndpointThunk<Thunk, Definition>['rejected']>;
+type Matcher<M> = (value: any) => value is M;
+interface Matchers<Thunk extends QueryThunk | MutationThunk | InfiniteQueryThunk<any>, Definition extends EndpointDefinition<any, any, any, any>> {
+    matchPending: Matcher<PendingAction<Thunk, Definition>>;
+    matchFulfilled: Matcher<FulfilledAction<Thunk, Definition>>;
+    matchRejected: Matcher<RejectedAction<Thunk, Definition>>;
+}
+type QueryThunkArg = QuerySubstateIdentifier & StartQueryActionCreatorOptions & {
+    type: 'query';
+    originalArgs: unknown;
+    endpointName: string;
+};
+type InfiniteQueryThunkArg<D extends InfiniteQueryDefinition<any, any, any, any, any>> = QuerySubstateIdentifier & StartInfiniteQueryActionCreatorOptions<D> & {
+    type: `query`;
+    originalArgs: unknown;
+    endpointName: string;
+    param: unknown;
+    direction?: InfiniteQueryDirection;
+};
+type MutationThunkArg = {
+    type: 'mutation';
+    originalArgs: unknown;
+    endpointName: string;
+    track?: boolean;
+    fixedCacheKey?: string;
+};
+type ThunkResult = unknown;
+type ThunkApiMetaConfig = {
+    pendingMeta: {
+        startedTimeStamp: number;
+        [SHOULD_AUTOBATCH]: true;
+    };
+    fulfilledMeta: {
+        fulfilledTimeStamp: number;
+        baseQueryMeta: unknown;
+        [SHOULD_AUTOBATCH]: true;
+    };
+    rejectedMeta: {
+        baseQueryMeta: unknown;
+        [SHOULD_AUTOBATCH]: true;
+    };
+};
+type QueryThunk = AsyncThunk<ThunkResult, QueryThunkArg, ThunkApiMetaConfig>;
+type InfiniteQueryThunk<D extends InfiniteQueryDefinition<any, any, any, any, any>> = AsyncThunk<ThunkResult, InfiniteQueryThunkArg<D>, ThunkApiMetaConfig>;
+type MutationThunk = AsyncThunk<ThunkResult, MutationThunkArg, ThunkApiMetaConfig>;
+type MaybeDrafted<T> = T | Draft<T>;
+type Recipe<T> = (data: MaybeDrafted<T>) => void | MaybeDrafted<T>;
+type PatchQueryDataThunk<Definitions extends EndpointDefinitions, PartialState> = <EndpointName extends QueryKeys<Definitions>>(endpointName: EndpointName, arg: QueryArgFrom<Definitions[EndpointName]>, patches: readonly Patch[], updateProvided?: boolean) => ThunkAction<void, PartialState, any, UnknownAction>;
+type AllQueryKeys<Definitions extends EndpointDefinitions> = QueryKeys<Definitions> | InfiniteQueryKeys<Definitions>;
+type QueryArgFromAnyQueryDefinition<Definitions extends EndpointDefinitions, EndpointName extends AllQueryKeys<Definitions>> = Definitions[EndpointName] extends InfiniteQueryDefinition<any, any, any, any, any> ? InfiniteQueryArgFrom<Definitions[EndpointName]> : Definitions[EndpointName] extends QueryDefinition<any, any, any, any> ? QueryArgFrom<Definitions[EndpointName]> : never;
+type DataFromAnyQueryDefinition<Definitions extends EndpointDefinitions, EndpointName extends AllQueryKeys<Definitions>> = Definitions[EndpointName] extends InfiniteQueryDefinition<any, any, any, any, any> ? InfiniteData<ResultTypeFrom<Definitions[EndpointName]>, PageParamFrom<Definitions[EndpointName]>> : Definitions[EndpointName] extends QueryDefinition<any, any, any, any> ? ResultTypeFrom<Definitions[EndpointName]> : unknown;
+type UpsertThunkResult<Definitions extends EndpointDefinitions, EndpointName extends AllQueryKeys<Definitions>> = Definitions[EndpointName] extends InfiniteQueryDefinition<any, any, any, any, any> ? InfiniteQueryActionCreatorResult<Definitions[EndpointName]> : Definitions[EndpointName] extends QueryDefinition<any, any, any, any> ? QueryActionCreatorResult<Definitions[EndpointName]> : QueryActionCreatorResult<never>;
+type UpdateQueryDataThunk<Definitions extends EndpointDefinitions, PartialState> = <EndpointName extends AllQueryKeys<Definitions>>(endpointName: EndpointName, arg: QueryArgFromAnyQueryDefinition<Definitions, EndpointName>, updateRecipe: Recipe<DataFromAnyQueryDefinition<Definitions, EndpointName>>, updateProvided?: boolean) => ThunkAction<PatchCollection, PartialState, any, UnknownAction>;
+type UpsertQueryDataThunk<Definitions extends EndpointDefinitions, PartialState> = <EndpointName extends AllQueryKeys<Definitions>>(endpointName: EndpointName, arg: QueryArgFromAnyQueryDefinition<Definitions, EndpointName>, value: DataFromAnyQueryDefinition<Definitions, EndpointName>) => ThunkAction<UpsertThunkResult<Definitions, EndpointName>, PartialState, any, UnknownAction>;
+/**
+ * An object returned from dispatching a `api.util.updateQueryData` call.
+ */
+type PatchCollection = {
+    /**
+     * An `immer` Patch describing the cache update.
+     */
+    patches: Patch[];
+    /**
+     * An `immer` Patch to revert the cache update.
+     */
+    inversePatches: Patch[];
+    /**
+     * A function that will undo the cache update.
+     */
+    undo: () => void;
+};
+
+type SkipToken = typeof skipToken;
+/**
+ * Can be passed into `useQuery`, `useQueryState` or `useQuerySubscription`
+ * instead of the query argument to get the same effect as if setting
+ * `skip: true` in the query options.
+ *
+ * Useful for scenarios where a query should be skipped when `arg` is `undefined`
+ * and TypeScript complains about it because `arg` is not allowed to be passed
+ * in as `undefined`, such as
+ *
+ * ```ts
+ * // codeblock-meta title="will error if the query argument is not allowed to be undefined" no-transpile
+ * useSomeQuery(arg, { skip: !!arg })
+ * ```
+ *
+ * ```ts
+ * // codeblock-meta title="using skipToken instead" no-transpile
+ * useSomeQuery(arg ?? skipToken)
+ * ```
+ *
+ * If passed directly into a query or mutation selector, that selector will always
+ * return an uninitialized state.
+ */
+export declare const skipToken: unique symbol;
+type BuildSelectorsApiEndpointQuery<Definition extends QueryDefinition<any, any, any, any, any>, Definitions extends EndpointDefinitions> = {
+    select: QueryResultSelectorFactory<Definition, RootState<Definitions, TagTypesFrom<Definition>, ReducerPathFrom<Definition>>>;
+};
+type BuildSelectorsApiEndpointInfiniteQuery<Definition extends InfiniteQueryDefinition<any, any, any, any, any>, Definitions extends EndpointDefinitions> = {
+    select: InfiniteQueryResultSelectorFactory<Definition, RootState<Definitions, TagTypesFrom<Definition>, ReducerPathFrom<Definition>>>;
+};
+type BuildSelectorsApiEndpointMutation<Definition extends MutationDefinition<any, any, any, any, any>, Definitions extends EndpointDefinitions> = {
+    select: MutationResultSelectorFactory<Definition, RootState<Definitions, TagTypesFrom<Definition>, ReducerPathFrom<Definition>>>;
+};
+type QueryResultSelectorFactory<Definition extends QueryDefinition<any, any, any, any>, RootState> = (queryArg: QueryArgFrom<Definition> | SkipToken) => (state: RootState) => QueryResultSelectorResult<Definition>;
+type QueryResultSelectorResult<Definition extends QueryDefinition<any, any, any, any>> = QuerySubState<Definition> & RequestStatusFlags;
+type InfiniteQueryResultSelectorFactory<Definition extends InfiniteQueryDefinition<any, any, any, any, any>, RootState> = (queryArg: InfiniteQueryArgFrom<Definition> | SkipToken) => (state: RootState) => InfiniteQueryResultSelectorResult<Definition>;
+type InfiniteQueryResultFlags = {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    isFetchingNextPage: boolean;
+    isFetchingPreviousPage: boolean;
+    isFetchNextPageError: boolean;
+    isFetchPreviousPageError: boolean;
+};
+type InfiniteQueryResultSelectorResult<Definition extends InfiniteQueryDefinition<any, any, any, any, any>> = InfiniteQuerySubState<Definition> & RequestStatusFlags & InfiniteQueryResultFlags;
+type MutationResultSelectorFactory<Definition extends MutationDefinition<any, any, any, any>, RootState> = (requestId: string | {
+    requestId: string | undefined;
+    fixedCacheKey: string | undefined;
+} | SkipToken) => (state: RootState) => MutationResultSelectorResult<Definition>;
+type MutationResultSelectorResult<Definition extends MutationDefinition<any, any, any, any>> = MutationSubState<Definition> & RequestStatusFlags;
+
+type BuildInitiateApiEndpointQuery<Definition extends QueryDefinition<any, any, any, any, any>> = {
+    initiate: StartQueryActionCreator<Definition>;
+};
+type BuildInitiateApiEndpointInfiniteQuery<Definition extends InfiniteQueryDefinition<any, any, any, any, any>> = {
+    initiate: StartInfiniteQueryActionCreator<Definition>;
+};
+type BuildInitiateApiEndpointMutation<Definition extends MutationDefinition<any, any, any, any, any>> = {
+    initiate: StartMutationActionCreator<Definition>;
+};
+declare const forceQueryFnSymbol: unique symbol;
+type StartQueryActionCreatorOptions = {
+    subscribe?: boolean;
+    forceRefetch?: boolean | number;
+    subscriptionOptions?: SubscriptionOptions;
+    [forceQueryFnSymbol]?: () => QueryReturnValue;
+};
+type StartInfiniteQueryActionCreatorOptions<D extends InfiniteQueryDefinition<any, any, any, any, any>> = StartQueryActionCreatorOptions & {
+    direction?: InfiniteQueryDirection;
+    param?: unknown;
+} & Partial<Pick<Partial<InfiniteQueryConfigOptions<ResultTypeFrom<D>, PageParamFrom<D>, InfiniteQueryArgFrom<D>>>, 'initialPageParam'>>;
+type StartQueryActionCreator<D extends QueryDefinition<any, any, any, any, any>> = (arg: QueryArgFrom<D>, options?: StartQueryActionCreatorOptions) => ThunkAction<QueryActionCreatorResult<D>, any, any, UnknownAction>;
+type StartInfiniteQueryActionCreator<D extends InfiniteQueryDefinition<any, any, any, any, any>> = (arg: InfiniteQueryArgFrom<D>, options?: StartInfiniteQueryActionCreatorOptions<D>) => ThunkAction<InfiniteQueryActionCreatorResult<D>, any, any, UnknownAction>;
+type QueryActionCreatorFields = {
+    requestId: string;
+    subscriptionOptions: SubscriptionOptions | undefined;
+    abort(): void;
     unsubscribe(): void;
-    /**
-     * It will subscribe a listener if it was previously removed, noop otherwise.
-     */
-    subscribe(): void;
-    /**
-     * Returns a promise that resolves when the input predicate returns `true` or
-     * rejects if the listener has been cancelled or is completed.
-     *
-     * The return value is `true` if the predicate succeeds or `false` if a timeout is provided and expires first.
-     *
-     * ### Example
-     *
-     * ```ts
-     * const updateBy = createAction<number>('counter/updateBy');
-     *
-     * middleware.startListening({
-     *  actionCreator: updateBy,
-     *  async effect(_, { condition }) {
-     *    // wait at most 3s for `updateBy` actions.
-     *    if(await condition(updateBy.match, 3_000)) {
-     *      // `updateBy` has been dispatched twice in less than 3s.
-     *    }
-     *  }
-     * })
-     * ```
-     */
-    condition: ConditionFunction<State>;
-    /**
-     * Returns a promise that resolves when the input predicate returns `true` or
-     * rejects if the listener has been cancelled or is completed.
-     *
-     * The return value is the `[action, currentState, previousState]` combination that the predicate saw as arguments.
-     *
-     * The promise resolves to null if a timeout is provided and expires first,
-     *
-     * ### Example
-     *
-     * ```ts
-     * const updateBy = createAction<number>('counter/updateBy');
-     *
-     * middleware.startListening({
-     *  actionCreator: updateBy,
-     *  async effect(_, { take }) {
-     *    const [{ payload }] =  await take(updateBy.match);
-     *    console.log(payload); // logs 5;
-     *  }
-     * })
-     *
-     * store.dispatch(updateBy(5));
-     * ```
-     */
-    take: TakePattern<State>;
-    /**
-     * Cancels all other running instances of this same listener except for the one that made this call.
-     */
-    cancelActiveListeners: () => void;
-    /**
-     * Cancels the instance of this listener that made this call.
-     */
-    cancel: () => void;
-    /**
-     * Throws a `TaskAbortError` if this listener has been cancelled
-     */
-    throwIfCancelled: () => void;
-    /**
-     * An abort signal whose `aborted` property is set to `true`
-     * if the listener execution is either aborted or completed.
-     * @see https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal
-     */
-    signal: AbortSignal;
-    /**
-     * Returns a promise that resolves after `timeoutMs` or
-     * rejects if the listener has been cancelled or is completed.
-     */
-    delay(timeoutMs: number): Promise<void>;
-    /**
-     * Queues in the next microtask the execution of a task.
-     * @param executor
-     * @param options
-     */
-    fork<T>(executor: ForkedTaskExecutor<T>, options?: ForkOptions): ForkedTask<T>;
-    /**
-     * Returns a promise that resolves when `waitFor` resolves or
-     * rejects if the listener has been cancelled or is completed.
-     * @param promise
-     */
-    pause<M>(promise: Promise<M>): Promise<M>;
-    extra: ExtraArgument;
-}
-/** @public */
-type ListenerEffect<ActionType extends Action, State, DispatchType extends Dispatch, ExtraArgument = unknown> = (action: ActionType, api: ListenerEffectAPI<State, DispatchType, ExtraArgument>) => void | Promise<void>;
-/**
- * @public
- * Additional infos regarding the error raised.
- */
-interface ListenerErrorInfo {
-    /**
-     * Which function has generated the exception.
-     */
-    raisedBy: 'effect' | 'predicate';
-}
-/**
- * @public
- * Gets notified with synchronous and asynchronous errors raised by `listeners` or `predicates`.
- * @param error The thrown error.
- * @param errorInfo Additional information regarding the thrown error.
- */
-interface ListenerErrorHandler {
-    (error: unknown, errorInfo: ListenerErrorInfo): void;
-}
-/** @public */
-interface CreateListenerMiddlewareOptions<ExtraArgument = unknown> {
-    extra?: ExtraArgument;
-    /**
-     * Receives synchronous errors that are raised by `listener` and `listenerOption.predicate`.
-     */
-    onError?: ListenerErrorHandler;
-}
-/** @public */
-type ListenerMiddleware<State = unknown, DispatchType extends ThunkDispatch<State, unknown, Action> = ThunkDispatch<State, unknown, UnknownAction>, ExtraArgument = unknown> = Middleware<{
-    (action: Action<'listenerMiddleware/add'>): UnsubscribeListener;
-}, State, DispatchType>;
-/** @public */
-interface ListenerMiddlewareInstance<StateType = unknown, DispatchType extends ThunkDispatch<StateType, unknown, Action> = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown> {
-    middleware: ListenerMiddleware<StateType, DispatchType, ExtraArgument>;
-    startListening: AddListenerOverloads<UnsubscribeListener, StateType, DispatchType, ExtraArgument> & TypedStartListening<StateType, DispatchType, ExtraArgument>;
-    stopListening: RemoveListenerOverloads<StateType, DispatchType> & TypedStopListening<StateType, DispatchType>;
-    /**
-     * Unsubscribes all listeners, cancels running listeners and tasks.
-     */
-    clearListeners: () => void;
-}
-/**
- * API Function Overloads
- */
-/** @public */
-type TakePatternOutputWithoutTimeout<State, Predicate extends AnyListenerPredicate<State>> = Predicate extends MatchFunction<infer ActionType> ? Promise<[ActionType, State, State]> : Promise<[UnknownAction, State, State]>;
-/** @public */
-type TakePatternOutputWithTimeout<State, Predicate extends AnyListenerPredicate<State>> = Predicate extends MatchFunction<infer ActionType> ? Promise<[ActionType, State, State] | null> : Promise<[UnknownAction, State, State] | null>;
-/** @public */
-interface TakePattern<State> {
-    <Predicate extends AnyListenerPredicate<State>>(predicate: Predicate): TakePatternOutputWithoutTimeout<State, Predicate>;
-    <Predicate extends AnyListenerPredicate<State>>(predicate: Predicate, timeout: number): TakePatternOutputWithTimeout<State, Predicate>;
-    <Predicate extends AnyListenerPredicate<State>>(predicate: Predicate, timeout?: number | undefined): TakePatternOutputWithTimeout<State, Predicate>;
-}
-/** @public */
-interface UnsubscribeListenerOptions {
-    cancelActive?: true;
-}
-/** @public */
-type UnsubscribeListener = (unsubscribeOptions?: UnsubscribeListenerOptions) => void;
-/**
- * @public
- * The possible overloads and options for defining a listener. The return type of each function is specified as a generic arg, so the overloads can be reused for multiple different functions
- */
-type AddListenerOverloads<Return, StateType = unknown, DispatchType extends Dispatch = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown, AdditionalOptions = unknown> = {
-    /** Accepts a "listener predicate" that is also a TS type predicate for the action*/
-    <MiddlewareActionType extends UnknownAction, ListenerPredicateType extends ListenerPredicate<MiddlewareActionType, StateType>>(options: {
-        actionCreator?: never;
-        type?: never;
-        matcher?: never;
-        predicate: ListenerPredicateType;
-        effect: ListenerEffect<ListenerPredicateGuardedActionType<ListenerPredicateType>, StateType, DispatchType, ExtraArgument>;
-    } & AdditionalOptions): Return;
-    /** Accepts an RTK action creator, like `incrementByAmount` */
-    <ActionCreatorType extends TypedActionCreatorWithMatchFunction<any>>(options: {
-        actionCreator: ActionCreatorType;
-        type?: never;
-        matcher?: never;
-        predicate?: never;
-        effect: ListenerEffect<ReturnType<ActionCreatorType>, StateType, DispatchType, ExtraArgument>;
-    } & AdditionalOptions): Return;
-    /** Accepts a specific action type string */
-    <T extends string>(options: {
-        actionCreator?: never;
-        type: T;
-        matcher?: never;
-        predicate?: never;
-        effect: ListenerEffect<Action<T>, StateType, DispatchType, ExtraArgument>;
-    } & AdditionalOptions): Return;
-    /** Accepts an RTK matcher function, such as `incrementByAmount.match` */
-    <MatchFunctionType extends MatchFunction<UnknownAction>>(options: {
-        actionCreator?: never;
-        type?: never;
-        matcher: MatchFunctionType;
-        predicate?: never;
-        effect: ListenerEffect<GuardedType<MatchFunctionType>, StateType, DispatchType, ExtraArgument>;
-    } & AdditionalOptions): Return;
-    /** Accepts a "listener predicate" that just returns a boolean, no type assertion */
-    <ListenerPredicateType extends AnyListenerPredicate<StateType>>(options: {
-        actionCreator?: never;
-        type?: never;
-        matcher?: never;
-        predicate: ListenerPredicateType;
-        effect: ListenerEffect<UnknownAction, StateType, DispatchType, ExtraArgument>;
-    } & AdditionalOptions): Return;
+    updateSubscriptionOptions(options: SubscriptionOptions): void;
+    queryCacheKey: string;
 };
-/** @public */
-type RemoveListenerOverloads<StateType = unknown, DispatchType extends Dispatch = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown> = AddListenerOverloads<boolean, StateType, DispatchType, ExtraArgument, UnsubscribeListenerOptions>;
-/**
- * A "pre-typed" version of `addListenerAction`, so the listener args are well-typed
- *
- * @public
- */
-type TypedAddListener<StateType, DispatchType extends Dispatch = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown, Payload = ListenerEntry<StateType, DispatchType>, T extends string = 'listenerMiddleware/add'> = BaseActionCreator<Payload, T> & AddListenerOverloads<PayloadAction<Payload, T>, StateType, DispatchType, ExtraArgument> & {
+type QueryActionCreatorResult<D extends QueryDefinition<any, any, any, any>> = SafePromise<QueryResultSelectorResult<D>> & QueryActionCreatorFields & {
+    arg: QueryArgFrom<D>;
+    unwrap(): Promise<ResultTypeFrom<D>>;
+    refetch(): QueryActionCreatorResult<D>;
+};
+type InfiniteQueryActionCreatorResult<D extends InfiniteQueryDefinition<any, any, any, any, any>> = SafePromise<InfiniteQueryResultSelectorResult<D>> & QueryActionCreatorFields & {
+    arg: InfiniteQueryArgFrom<D>;
+    unwrap(): Promise<InfiniteData<ResultTypeFrom<D>, PageParamFrom<D>>>;
+    refetch(): InfiniteQueryActionCreatorResult<D>;
+};
+type StartMutationActionCreator<D extends MutationDefinition<any, any, any, any>> = (arg: QueryArgFrom<D>, options?: {
     /**
-     * Creates a "pre-typed" version of `addListener`
-     * where the `state`, `dispatch` and `extra` types are predefined.
-     *
-     * This allows you to set the `state`, `dispatch` and `extra` types once,
-     * eliminating the need to specify them with every `addListener` call.
-     *
-     * @returns A pre-typed `addListener` with the state, dispatch and extra types already defined.
-     *
-     * @example
-     * ```ts
-     * import { addListener } from '@reduxjs/toolkit'
-     *
-     * export const addAppListener = addListener.withTypes<RootState, AppDispatch, ExtraArguments>()
-     * ```
-     *
-     * @template OverrideStateType - The specific type of state the middleware listener operates on.
-     * @template OverrideDispatchType - The specific type of the dispatch function.
-     * @template OverrideExtraArgument - The specific type of the extra object.
-     *
-     * @since 2.1.0
+     * If this mutation should be tracked in the store.
+     * If you just want to manually trigger this mutation using `dispatch` and don't care about the
+     * result, state & potential errors being held in store, you can set this to false.
+     * (defaults to `true`)
      */
-    withTypes: <OverrideStateType extends StateType, OverrideDispatchType extends Dispatch = ThunkDispatch<OverrideStateType, unknown, UnknownAction>, OverrideExtraArgument = unknown>() => TypedAddListener<OverrideStateType, OverrideDispatchType, OverrideExtraArgument>;
-};
-/**
- * A "pre-typed" version of `removeListenerAction`, so the listener args are well-typed
- *
- * @public
- */
-type TypedRemoveListener<StateType, DispatchType extends Dispatch = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown, Payload = ListenerEntry<StateType, DispatchType>, T extends string = 'listenerMiddleware/remove'> = BaseActionCreator<Payload, T> & AddListenerOverloads<PayloadAction<Payload, T>, StateType, DispatchType, ExtraArgument, UnsubscribeListenerOptions> & {
-    /**
-     * Creates a "pre-typed" version of `removeListener`
-     * where the `state`, `dispatch` and `extra` types are predefined.
-     *
-     * This allows you to set the `state`, `dispatch` and `extra` types once,
-     * eliminating the need to specify them with every `removeListener` call.
-     *
-     * @returns A pre-typed `removeListener` with the state, dispatch and extra
-     * types already defined.
-     *
-     * @example
-     * ```ts
-     * import { removeListener } from '@reduxjs/toolkit'
-     *
-     * export const removeAppListener = removeListener.withTypes<
-     *   RootState,
-     *   AppDispatch,
-     *   ExtraArguments
-     * >()
-     * ```
-     *
-     * @template OverrideStateType - The specific type of state the middleware listener operates on.
-     * @template OverrideDispatchType - The specific type of the dispatch function.
-     * @template OverrideExtraArgument - The specific type of the extra object.
-     *
-     * @since 2.1.0
-     */
-    withTypes: <OverrideStateType extends StateType, OverrideDispatchType extends Dispatch = ThunkDispatch<OverrideStateType, unknown, UnknownAction>, OverrideExtraArgument = unknown>() => TypedRemoveListener<OverrideStateType, OverrideDispatchType, OverrideExtraArgument>;
-};
-/**
- * A "pre-typed" version of `middleware.startListening`, so the listener args are well-typed
- *
- * @public
- */
-type TypedStartListening<StateType, DispatchType extends Dispatch = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown> = AddListenerOverloads<UnsubscribeListener, StateType, DispatchType, ExtraArgument> & {
-    /**
-     * Creates a "pre-typed" version of
-     * {@linkcode ListenerMiddlewareInstance.startListening startListening}
-     * where the `state`, `dispatch` and `extra` types are predefined.
-     *
-     * This allows you to set the `state`, `dispatch` and `extra` types once,
-     * eliminating the need to specify them with every
-     * {@linkcode ListenerMiddlewareInstance.startListening startListening} call.
-     *
-     * @returns A pre-typed `startListening` with the state, dispatch and extra types already defined.
-     *
-     * @example
-     * ```ts
-     * import { createListenerMiddleware } from '@reduxjs/toolkit'
-     *
-     * const listenerMiddleware = createListenerMiddleware()
-     *
-     * export const startAppListening = listenerMiddleware.startListening.withTypes<
-     *   RootState,
-     *   AppDispatch,
-     *   ExtraArguments
-     * >()
-     * ```
-     *
-     * @template OverrideStateType - The specific type of state the middleware listener operates on.
-     * @template OverrideDispatchType - The specific type of the dispatch function.
-     * @template OverrideExtraArgument - The specific type of the extra object.
-     *
-     * @since 2.1.0
-     */
-    withTypes: <OverrideStateType extends StateType, OverrideDispatchType extends Dispatch = ThunkDispatch<OverrideStateType, unknown, UnknownAction>, OverrideExtraArgument = unknown>() => TypedStartListening<OverrideStateType, OverrideDispatchType, OverrideExtraArgument>;
-};
-/**
- * A "pre-typed" version of `middleware.stopListening`, so the listener args are well-typed
- *
- * @public
- */
-type TypedStopListening<StateType, DispatchType extends Dispatch = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown> = RemoveListenerOverloads<StateType, DispatchType, ExtraArgument> & {
-    /**
-     * Creates a "pre-typed" version of
-     * {@linkcode ListenerMiddlewareInstance.stopListening stopListening}
-     * where the `state`, `dispatch` and `extra` types are predefined.
-     *
-     * This allows you to set the `state`, `dispatch` and `extra` types once,
-     * eliminating the need to specify them with every
-     * {@linkcode ListenerMiddlewareInstance.stopListening stopListening} call.
-     *
-     * @returns A pre-typed `stopListening` with the state, dispatch and extra types already defined.
-     *
-     * @example
-     * ```ts
-     * import { createListenerMiddleware } from '@reduxjs/toolkit'
-     *
-     * const listenerMiddleware = createListenerMiddleware()
-     *
-     * export const stopAppListening = listenerMiddleware.stopListening.withTypes<
-     *   RootState,
-     *   AppDispatch,
-     *   ExtraArguments
-     * >()
-     * ```
-     *
-     * @template OverrideStateType - The specific type of state the middleware listener operates on.
-     * @template OverrideDispatchType - The specific type of the dispatch function.
-     * @template OverrideExtraArgument - The specific type of the extra object.
-     *
-     * @since 2.1.0
-     */
-    withTypes: <OverrideStateType extends StateType, OverrideDispatchType extends Dispatch = ThunkDispatch<OverrideStateType, unknown, UnknownAction>, OverrideExtraArgument = unknown>() => TypedStopListening<OverrideStateType, OverrideDispatchType, OverrideExtraArgument>;
-};
-/**
- * Internal Types
- */
-/** @internal An single listener entry */
-type ListenerEntry<State = unknown, DispatchType extends Dispatch = Dispatch> = {
-    id: string;
-    effect: ListenerEffect<any, State, DispatchType>;
-    unsubscribe: () => void;
-    pending: Set<AbortController>;
-    type?: string;
-    predicate: ListenerPredicate<UnknownAction, State>;
-};
-/**
- * Utility Types
- */
-/** @public */
-type GuardedType<T> = T extends (x: any, ...args: any[]) => x is infer T ? T : never;
-/** @public */
-type ListenerPredicateGuardedActionType<T> = T extends ListenerPredicate<infer ActionType, any> ? ActionType : never;
-
-/**
- * @public
- */
-declare const addListener: TypedAddListener<unknown>;
-/**
- * @public
- */
-declare const clearAllListeners: ActionCreatorWithoutPayload<"listenerMiddleware/removeAll">;
-/**
- * @public
- */
-declare const removeListener: TypedRemoveListener<unknown>;
-/**
- * @public
- */
-declare const createListenerMiddleware: <StateType = unknown, DispatchType extends Dispatch<Action> = ThunkDispatch<StateType, unknown, UnknownAction>, ExtraArgument = unknown>(middlewareOptions?: CreateListenerMiddlewareOptions<ExtraArgument>) => ListenerMiddlewareInstance<StateType, DispatchType, ExtraArgument>;
-
-type MiddlewareApiConfig = {
-    state?: unknown;
-    dispatch?: Dispatch;
-};
-type GetDispatchType<MiddlewareApiConfig> = MiddlewareApiConfig extends {
-    dispatch: infer DispatchType;
-} ? FallbackIfUnknown<DispatchType, Dispatch> : Dispatch;
-type AddMiddleware<State = any, DispatchType extends Dispatch<UnknownAction> = Dispatch<UnknownAction>> = {
-    (...middlewares: Middleware<any, State, DispatchType>[]): void;
-    withTypes<MiddlewareConfig extends MiddlewareApiConfig>(): AddMiddleware<GetState<MiddlewareConfig>, GetDispatchType<MiddlewareConfig>>;
-};
-type WithMiddleware<State = any, DispatchType extends Dispatch<UnknownAction> = Dispatch<UnknownAction>> = BaseActionCreator<Middleware<any, State, DispatchType>[], 'dynamicMiddleware/add', {
-    instanceId: string;
+    track?: boolean;
+    fixedCacheKey?: string;
+}) => ThunkAction<MutationActionCreatorResult<D>, any, any, UnknownAction>;
+type MutationActionCreatorResult<D extends MutationDefinition<any, any, any, any>> = SafePromise<{
+    data: ResultTypeFrom<D>;
+    error?: undefined;
+} | {
+    data?: undefined;
+    error: Exclude<BaseQueryError<D extends MutationDefinition<any, infer BaseQuery, any, any> ? BaseQuery : never>, undefined> | SerializedError;
 }> & {
-    <Middlewares extends Middleware<any, State, DispatchType>[]>(...middlewares: Middlewares): PayloadAction<Middlewares, 'dynamicMiddleware/add', {
-        instanceId: string;
-    }>;
-    withTypes<MiddlewareConfig extends MiddlewareApiConfig>(): WithMiddleware<GetState<MiddlewareConfig>, GetDispatchType<MiddlewareConfig>>;
-};
-interface DynamicDispatch {
-    <Middlewares extends Middleware<any>[]>(action: PayloadAction<Middlewares, 'dynamicMiddleware/add'>): ExtractDispatchExtensions<Middlewares> & this;
-}
-type DynamicMiddleware<State = unknown, DispatchType extends Dispatch<UnknownAction> = Dispatch<UnknownAction>> = Middleware<DynamicDispatch, State, DispatchType>;
-type DynamicMiddlewareInstance<State = unknown, DispatchType extends Dispatch<UnknownAction> = Dispatch<UnknownAction>> = {
-    middleware: DynamicMiddleware<State, DispatchType>;
-    addMiddleware: AddMiddleware<State, DispatchType>;
-    withMiddleware: WithMiddleware<State, DispatchType>;
-    instanceId: string;
+    /** @internal */
+    arg: {
+        /**
+         * The name of the given endpoint for the mutation
+         */
+        endpointName: string;
+        /**
+         * The original arguments supplied to the mutation call
+         */
+        originalArgs: QueryArgFrom<D>;
+        /**
+         * Whether the mutation is being tracked in the store.
+         */
+        track?: boolean;
+        fixedCacheKey?: string;
+    };
+    /**
+     * A unique string generated for the request sequence
+     */
+    requestId: string;
+    /**
+     * A method to cancel the mutation promise. Note that this is not intended to prevent the mutation
+     * that was fired off from reaching the server, but only to assist in handling the response.
+     *
+     * Calling `abort()` prior to the promise resolving will force it to reach the error state with
+     * the serialized error:
+     * `{ name: 'AbortError', message: 'Aborted' }`
+     *
+     * @example
+     * ```ts
+     * const [updateUser] = useUpdateUserMutation();
+     *
+     * useEffect(() => {
+     *   const promise = updateUser(id);
+     *   promise
+     *     .unwrap()
+     *     .catch((err) => {
+     *       if (err.name === 'AbortError') return;
+     *       // else handle the unexpected error
+     *     })
+     *
+     *   return () => {
+     *     promise.abort();
+     *   }
+     * }, [id, updateUser])
+     * ```
+     */
+    abort(): void;
+    /**
+     * Unwraps a mutation call to provide the raw response/error.
+     *
+     * @remarks
+     * If you need to access the error or success payload immediately after a mutation, you can chain .unwrap().
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta title="Using .unwrap"
+     * addPost({ id: 1, name: 'Example' })
+     *   .unwrap()
+     *   .then((payload) => console.log('fulfilled', payload))
+     *   .catch((error) => console.error('rejected', error));
+     * ```
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta title="Using .unwrap with async await"
+     * try {
+     *   const payload = await addPost({ id: 1, name: 'Example' }).unwrap();
+     *   console.log('fulfilled', payload)
+     * } catch (error) {
+     *   console.error('rejected', error);
+     * }
+     * ```
+     */
+    unwrap(): Promise<ResultTypeFrom<D>>;
+    /**
+     * A method to manually unsubscribe from the mutation call, meaning it will be removed from cache after the usual caching grace period.
+     The value returned by the hook will reset to `isUninitialized` afterwards.
+     */
+    reset(): void;
 };
 
-declare const createDynamicMiddleware: <State = any, DispatchType extends Dispatch<UnknownAction> = Dispatch<UnknownAction>>() => DynamicMiddlewareInstance<State, DispatchType>;
+type ReferenceCacheLifecycle = never;
+interface QueryBaseLifecycleApi<QueryArg, BaseQuery extends BaseQueryFn, ResultType, ReducerPath extends string = string> extends LifecycleApi<ReducerPath> {
+    /**
+     * Gets the current value of this cache entry.
+     */
+    getCacheEntry(): QueryResultSelectorResult<{
+        type: DefinitionType.query;
+    } & BaseEndpointDefinition<QueryArg, BaseQuery, ResultType, BaseQueryResult<BaseQuery>>>;
+    /**
+     * Updates the current cache entry value.
+     * For documentation see `api.util.updateQueryData`.
+     */
+    updateCachedData(updateRecipe: Recipe<ResultType>): PatchCollection;
+}
+type MutationBaseLifecycleApi<QueryArg, BaseQuery extends BaseQueryFn, ResultType, ReducerPath extends string = string> = LifecycleApi<ReducerPath> & {
+    /**
+     * Gets the current value of this cache entry.
+     */
+    getCacheEntry(): MutationResultSelectorResult<{
+        type: DefinitionType.mutation;
+    } & BaseEndpointDefinition<QueryArg, BaseQuery, ResultType, BaseQueryResult<BaseQuery>>>;
+};
+type LifecycleApi<ReducerPath extends string = string> = {
+    /**
+     * The dispatch method for the store
+     */
+    dispatch: ThunkDispatch<any, any, UnknownAction>;
+    /**
+     * A method to get the current state
+     */
+    getState(): RootState<any, any, ReducerPath>;
+    /**
+     * `extra` as provided as `thunk.extraArgument` to the `configureStore` `getDefaultMiddleware` option.
+     */
+    extra: unknown;
+    /**
+     * A unique ID generated for the mutation
+     */
+    requestId: string;
+};
+type CacheLifecyclePromises<ResultType = unknown, MetaType = unknown> = {
+    /**
+     * Promise that will resolve with the first value for this cache key.
+     * This allows you to `await` until an actual value is in cache.
+     *
+     * If the cache entry is removed from the cache before any value has ever
+     * been resolved, this Promise will reject with
+     * `new Error('Promise never resolved before cacheEntryRemoved.')`
+     * to prevent memory leaks.
+     * You can just re-throw that error (or not handle it at all) -
+     * it will be caught outside of `cacheEntryAdded`.
+     *
+     * If you don't interact with this promise, it will not throw.
+     */
+    cacheDataLoaded: PromiseWithKnownReason<{
+        /**
+         * The (transformed) query result.
+         */
+        data: ResultType;
+        /**
+         * The `meta` returned by the `baseQuery`
+         */
+        meta: MetaType;
+    }, typeof neverResolvedError>;
+    /**
+     * Promise that allows you to wait for the point in time when the cache entry
+     * has been removed from the cache, by not being used/subscribed to any more
+     * in the application for too long or by dispatching `api.util.resetApiState`.
+     */
+    cacheEntryRemoved: Promise<void>;
+};
+interface QueryCacheLifecycleApi<QueryArg, BaseQuery extends BaseQueryFn, ResultType, ReducerPath extends string = string> extends QueryBaseLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath>, CacheLifecyclePromises<ResultType, BaseQueryMeta<BaseQuery>> {
+}
+type MutationCacheLifecycleApi<QueryArg, BaseQuery extends BaseQueryFn, ResultType, ReducerPath extends string = string> = MutationBaseLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath> & CacheLifecyclePromises<ResultType, BaseQueryMeta<BaseQuery>>;
+type CacheLifecycleQueryExtraOptions<ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string> = {
+    onCacheEntryAdded?(arg: QueryArg, api: QueryCacheLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath>): Promise<void> | void;
+};
+type CacheLifecycleInfiniteQueryExtraOptions<ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string> = CacheLifecycleQueryExtraOptions<ResultType, QueryArg, BaseQuery, ReducerPath>;
+type CacheLifecycleMutationExtraOptions<ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string> = {
+    onCacheEntryAdded?(arg: QueryArg, api: MutationCacheLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath>): Promise<void> | void;
+};
+declare const neverResolvedError: Error & {
+    message: "Promise never resolved before cacheEntryRemoved.";
+};
+
+type ReferenceQueryLifecycle = never;
+type QueryLifecyclePromises<ResultType, BaseQuery extends BaseQueryFn> = {
+    /**
+     * Promise that will resolve with the (transformed) query result.
+     *
+     * If the query fails, this promise will reject with the error.
+     *
+     * This allows you to `await` for the query to finish.
+     *
+     * If you don't interact with this promise, it will not throw.
+     */
+    queryFulfilled: PromiseWithKnownReason<{
+        /**
+         * The (transformed) query result.
+         */
+        data: ResultType;
+        /**
+         * The `meta` returned by the `baseQuery`
+         */
+        meta: BaseQueryMeta<BaseQuery>;
+    }, QueryFulfilledRejectionReason<BaseQuery>>;
+};
+type QueryFulfilledRejectionReason<BaseQuery extends BaseQueryFn> = {
+    error: BaseQueryError<BaseQuery>;
+    /**
+     * If this is `false`, that means this error was returned from the `baseQuery` or `queryFn` in a controlled manner.
+     */
+    isUnhandledError: false;
+    /**
+     * The `meta` returned by the `baseQuery`
+     */
+    meta: BaseQueryMeta<BaseQuery>;
+} | {
+    error: unknown;
+    meta?: undefined;
+    /**
+     * If this is `true`, that means that this error is the result of `baseQueryFn`, `queryFn`, `transformResponse` or `transformErrorResponse` throwing an error instead of handling it properly.
+     * There can not be made any assumption about the shape of `error`.
+     */
+    isUnhandledError: true;
+};
+type QueryLifecycleQueryExtraOptions<ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string> = {
+    /**
+     * A function that is called when the individual query is started. The function is called with a lifecycle api object containing properties such as `queryFulfilled`, allowing code to be run when a query is started, when it succeeds, and when it fails (i.e. throughout the lifecycle of an individual query/mutation call).
+     *
+     * Can be used to perform side-effects throughout the lifecycle of the query.
+     *
+     * @example
+     * ```ts
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
+     * import { messageCreated } from './notificationsSlice
+     * export interface Post {
+     *   id: number
+     *   name: string
+     * }
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({
+     *     baseUrl: '/',
+     *   }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, number>({
+     *       query: (id) => `post/${id}`,
+     *       async onQueryStarted(id, { dispatch, queryFulfilled }) {
+     *         // `onStart` side-effect
+     *         dispatch(messageCreated('Fetching posts...'))
+     *         try {
+     *           const { data } = await queryFulfilled
+     *           // `onSuccess` side-effect
+     *           dispatch(messageCreated('Posts received!'))
+     *         } catch (err) {
+     *           // `onError` side-effect
+     *           dispatch(messageCreated('Error fetching posts!'))
+     *         }
+     *       }
+     *     }),
+     *   }),
+     * })
+     * ```
+     */
+    onQueryStarted?(queryArgument: QueryArg, queryLifeCycleApi: QueryLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath>): Promise<void> | void;
+};
+type QueryLifecycleInfiniteQueryExtraOptions<ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string> = QueryLifecycleQueryExtraOptions<ResultType, QueryArg, BaseQuery, ReducerPath>;
+type QueryLifecycleMutationExtraOptions<ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string> = {
+    /**
+     * A function that is called when the individual mutation is started. The function is called with a lifecycle api object containing properties such as `queryFulfilled`, allowing code to be run when a query is started, when it succeeds, and when it fails (i.e. throughout the lifecycle of an individual query/mutation call).
+     *
+     * Can be used for `optimistic updates`.
+     *
+     * @example
+     *
+     * ```ts
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
+     * export interface Post {
+     *   id: number
+     *   name: string
+     * }
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({
+     *     baseUrl: '/',
+     *   }),
+     *   tagTypes: ['Post'],
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, number>({
+     *       query: (id) => `post/${id}`,
+     *       providesTags: ['Post'],
+     *     }),
+     *     updatePost: build.mutation<void, Pick<Post, 'id'> & Partial<Post>>({
+     *       query: ({ id, ...patch }) => ({
+     *         url: `post/${id}`,
+     *         method: 'PATCH',
+     *         body: patch,
+     *       }),
+     *       invalidatesTags: ['Post'],
+     *       async onQueryStarted({ id, ...patch }, { dispatch, queryFulfilled }) {
+     *         const patchResult = dispatch(
+     *           api.util.updateQueryData('getPost', id, (draft) => {
+     *             Object.assign(draft, patch)
+     *           })
+     *         )
+     *         try {
+     *           await queryFulfilled
+     *         } catch {
+     *           patchResult.undo()
+     *         }
+     *       },
+     *     }),
+     *   }),
+     * })
+     * ```
+     */
+    onQueryStarted?(queryArgument: QueryArg, mutationLifeCycleApi: MutationLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath>): Promise<void> | void;
+};
+interface QueryLifecycleApi<QueryArg, BaseQuery extends BaseQueryFn, ResultType, ReducerPath extends string = string> extends QueryBaseLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath>, QueryLifecyclePromises<ResultType, BaseQuery> {
+}
+type MutationLifecycleApi<QueryArg, BaseQuery extends BaseQueryFn, ResultType, ReducerPath extends string = string> = MutationBaseLifecycleApi<QueryArg, BaseQuery, ResultType, ReducerPath> & QueryLifecyclePromises<ResultType, BaseQuery>;
+/**
+ * Provides a way to define a strongly-typed version of
+ * {@linkcode QueryLifecycleQueryExtraOptions.onQueryStarted | onQueryStarted}
+ * for a specific query.
+ *
+ * @example
+ * <caption>#### __Create and reuse a strongly-typed `onQueryStarted` function__</caption>
+ *
+ * ```ts
+ * import type { TypedQueryOnQueryStarted } from '@reduxjs/toolkit/query'
+ * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
+ *
+ * type Post = {
+ *   id: number
+ *   title: string
+ *   userId: number
+ * }
+ *
+ * type PostsApiResponse = {
+ *   posts: Post[]
+ *   total: number
+ *   skip: number
+ *   limit: number
+ * }
+ *
+ * type QueryArgument = number | undefined
+ *
+ * type BaseQueryFunction = ReturnType<typeof fetchBaseQuery>
+ *
+ * const baseApiSlice = createApi({
+ *   baseQuery: fetchBaseQuery({ baseUrl: 'https://dummyjson.com' }),
+ *   reducerPath: 'postsApi',
+ *   tagTypes: ['Posts'],
+ *   endpoints: (build) => ({
+ *     getPosts: build.query<PostsApiResponse, void>({
+ *       query: () => `/posts`,
+ *     }),
+ *
+ *     getPostById: build.query<Post, QueryArgument>({
+ *       query: (postId) => `/posts/${postId}`,
+ *     }),
+ *   }),
+ * })
+ *
+ * const updatePostOnFulfilled: TypedQueryOnQueryStarted<
+ *   PostsApiResponse,
+ *   QueryArgument,
+ *   BaseQueryFunction,
+ *   'postsApi'
+ * > = async (queryArgument, { dispatch, queryFulfilled }) => {
+ *   const result = await queryFulfilled
+ *
+ *   const { posts } = result.data
+ *
+ *   // Pre-fill the individual post entries with the results
+ *   // from the list endpoint query
+ *   dispatch(
+ *     baseApiSlice.util.upsertQueryEntries(
+ *       posts.map((post) => ({
+ *         endpointName: 'getPostById',
+ *         arg: post.id,
+ *         value: post,
+ *       })),
+ *     ),
+ *   )
+ * }
+ *
+ * export const extendedApiSlice = baseApiSlice.injectEndpoints({
+ *   endpoints: (build) => ({
+ *     getPostsByUserId: build.query<PostsApiResponse, QueryArgument>({
+ *       query: (userId) => `/posts/user/${userId}`,
+ *
+ *       onQueryStarted: updatePostOnFulfilled,
+ *     }),
+ *   }),
+ * })
+ * ```
+ *
+ * @template ResultType - The type of the result `data` returned by the query.
+ * @template QueryArgumentType - The type of the argument passed into the query.
+ * @template BaseQueryFunctionType - The type of the base query function being used.
+ * @template ReducerPath - The type representing the `reducerPath` for the API slice.
+ *
+ * @since 2.4.0
+ * @public
+ */
+type TypedQueryOnQueryStarted<ResultType, QueryArgumentType, BaseQueryFunctionType extends BaseQueryFn, ReducerPath extends string = string> = QueryLifecycleQueryExtraOptions<ResultType, QueryArgumentType, BaseQueryFunctionType, ReducerPath>['onQueryStarted'];
+/**
+ * Provides a way to define a strongly-typed version of
+ * {@linkcode QueryLifecycleMutationExtraOptions.onQueryStarted | onQueryStarted}
+ * for a specific mutation.
+ *
+ * @example
+ * <caption>#### __Create and reuse a strongly-typed `onQueryStarted` function__</caption>
+ *
+ * ```ts
+ * import type { TypedMutationOnQueryStarted } from '@reduxjs/toolkit/query'
+ * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
+ *
+ * type Post = {
+ *   id: number
+ *   title: string
+ *   userId: number
+ * }
+ *
+ * type PostsApiResponse = {
+ *   posts: Post[]
+ *   total: number
+ *   skip: number
+ *   limit: number
+ * }
+ *
+ * type QueryArgument = Pick<Post, 'id'> & Partial<Post>
+ *
+ * type BaseQueryFunction = ReturnType<typeof fetchBaseQuery>
+ *
+ * const baseApiSlice = createApi({
+ *   baseQuery: fetchBaseQuery({ baseUrl: 'https://dummyjson.com' }),
+ *   reducerPath: 'postsApi',
+ *   tagTypes: ['Posts'],
+ *   endpoints: (build) => ({
+ *     getPosts: build.query<PostsApiResponse, void>({
+ *       query: () => `/posts`,
+ *     }),
+ *
+ *     getPostById: build.query<Post, number>({
+ *       query: (postId) => `/posts/${postId}`,
+ *     }),
+ *   }),
+ * })
+ *
+ * const updatePostOnFulfilled: TypedMutationOnQueryStarted<
+ *   Post,
+ *   QueryArgument,
+ *   BaseQueryFunction,
+ *   'postsApi'
+ * > = async ({ id, ...patch }, { dispatch, queryFulfilled }) => {
+ *   const patchCollection = dispatch(
+ *     baseApiSlice.util.updateQueryData('getPostById', id, (draftPost) => {
+ *       Object.assign(draftPost, patch)
+ *     }),
+ *   )
+ *
+ *   try {
+ *     await queryFulfilled
+ *   } catch {
+ *     patchCollection.undo()
+ *   }
+ * }
+ *
+ * export const extendedApiSlice = baseApiSlice.injectEndpoints({
+ *   endpoints: (build) => ({
+ *     addPost: build.mutation<Post, Omit<QueryArgument, 'id'>>({
+ *       query: (body) => ({
+ *         url: `posts/add`,
+ *         method: 'POST',
+ *         body,
+ *       }),
+ *
+ *       onQueryStarted: updatePostOnFulfilled,
+ *     }),
+ *
+ *     updatePost: build.mutation<Post, QueryArgument>({
+ *       query: ({ id, ...patch }) => ({
+ *         url: `post/${id}`,
+ *         method: 'PATCH',
+ *         body: patch,
+ *       }),
+ *
+ *       onQueryStarted: updatePostOnFulfilled,
+ *     }),
+ *   }),
+ * })
+ * ```
+ *
+ * @template ResultType - The type of the result `data` returned by the query.
+ * @template QueryArgumentType - The type of the argument passed into the query.
+ * @template BaseQueryFunctionType - The type of the base query function being used.
+ * @template ReducerPath - The type representing the `reducerPath` for the API slice.
+ *
+ * @since 2.4.0
+ * @public
+ */
+type TypedMutationOnQueryStarted<ResultType, QueryArgumentType, BaseQueryFunctionType extends BaseQueryFn, ReducerPath extends string = string> = QueryLifecycleMutationExtraOptions<ResultType, QueryArgumentType, BaseQueryFunctionType, ReducerPath>['onQueryStarted'];
 
 /**
- * Adapted from React: https://github.com/facebook/react/blob/master/packages/shared/formatProdErrorMessage.js
- *
- * Do not require this module directly! Use normal throw error calls. These messages will be replaced with error codes
- * during build.
- * @param {number} code
+ * A typesafe single entry to be upserted into the cache
  */
-declare function formatProdErrorMessage(code: number): string;
+type NormalizedQueryUpsertEntry<Definitions extends EndpointDefinitions, EndpointName extends AllQueryKeys<Definitions>> = {
+    endpointName: EndpointName;
+    arg: QueryArgFromAnyQueryDefinition<Definitions, EndpointName>;
+    value: DataFromAnyQueryDefinition<Definitions, EndpointName>;
+};
+/**
+ * The internal version that is not typesafe since we can't carry the generics through `createSlice`
+ */
+type NormalizedQueryUpsertEntryPayload = {
+    endpointName: string;
+    arg: unknown;
+    value: unknown;
+};
+type ProcessedQueryUpsertEntry = {
+    queryDescription: QueryThunkArg;
+    value: unknown;
+};
+/**
+ * A typesafe representation of a util action creator that accepts cache entry descriptions to upsert
+ */
+type UpsertEntries<Definitions extends EndpointDefinitions> = (<EndpointNames extends Array<AllQueryKeys<Definitions>>>(entries: [
+    ...{
+        [I in keyof EndpointNames]: NormalizedQueryUpsertEntry<Definitions, EndpointNames[I]>;
+    }
+]) => PayloadAction<NormalizedQueryUpsertEntryPayload[]>) & {
+    match: (action: unknown) => action is PayloadAction<NormalizedQueryUpsertEntryPayload[]>;
+};
+declare function buildSlice({ reducerPath, queryThunk, mutationThunk, serializeQueryArgs, context: { endpointDefinitions: definitions, apiUid, extractRehydrationInfo, hasRehydrationInfo, }, assertTagType, config, }: {
+    reducerPath: string;
+    queryThunk: QueryThunk;
+    infiniteQueryThunk: InfiniteQueryThunk<any>;
+    mutationThunk: MutationThunk;
+    serializeQueryArgs: InternalSerializeQueryArgs;
+    context: ApiContext<EndpointDefinitions>;
+    assertTagType: AssertTagTypes;
+    config: Omit<ConfigState<string>, 'online' | 'focused' | 'middlewareRegistered'>;
+}): {
+    reducer: redux.Reducer<{
+        queries: QueryState<any>;
+        mutations: MutationState<any>;
+        provided: InvalidationState<string>;
+        subscriptions: SubscriptionState;
+        config: ConfigState<string>;
+    }, redux.UnknownAction, Partial<{
+        queries: QueryState<any> | undefined;
+        mutations: MutationState<any> | undefined;
+        provided: InvalidationState<string> | undefined;
+        subscriptions: SubscriptionState | undefined;
+        config: ConfigState<string> | undefined;
+    }>>;
+    actions: {
+        resetApiState: _reduxjs_toolkit.ActionCreatorWithoutPayload<`${string}/resetApiState`>;
+        updateProvidedBy: _reduxjs_toolkit.ActionCreatorWithPreparedPayload<[payload: {
+            queryCacheKey: QueryCacheKey;
+            providedTags: readonly FullTagDescription<string>[];
+        }[]], {
+            queryCacheKey: QueryCacheKey;
+            providedTags: readonly FullTagDescription<string>[];
+        }[], `${string}/invalidation/updateProvidedBy`, never, unknown>;
+        removeMutationResult: _reduxjs_toolkit.ActionCreatorWithPreparedPayload<[payload: MutationSubstateIdentifier], MutationSubstateIdentifier, `${string}/mutations/removeMutationResult`, never, unknown>;
+        subscriptionsUpdated: _reduxjs_toolkit.ActionCreatorWithPreparedPayload<[payload: Patch[]], Patch[], `${string}/internalSubscriptions/subscriptionsUpdated`, never, unknown>;
+        updateSubscriptionOptions: _reduxjs_toolkit.ActionCreatorWithPayload<{
+            endpointName: string;
+            requestId: string;
+            options: Subscribers[number];
+        } & QuerySubstateIdentifier, `${string}/subscriptions/updateSubscriptionOptions`>;
+        unsubscribeQueryResult: _reduxjs_toolkit.ActionCreatorWithPayload<{
+            requestId: string;
+        } & QuerySubstateIdentifier, `${string}/subscriptions/unsubscribeQueryResult`>;
+        internal_getRTKQSubscriptions: _reduxjs_toolkit.ActionCreatorWithoutPayload<`${string}/subscriptions/internal_getRTKQSubscriptions`>;
+        removeQueryResult: _reduxjs_toolkit.ActionCreatorWithPreparedPayload<[payload: QuerySubstateIdentifier], QuerySubstateIdentifier, `${string}/queries/removeQueryResult`, never, unknown>;
+        cacheEntriesUpserted: _reduxjs_toolkit.ActionCreatorWithPreparedPayload<[payload: NormalizedQueryUpsertEntryPayload[]], ProcessedQueryUpsertEntry[], `${string}/queries/cacheEntriesUpserted`, never, {
+            RTK_autoBatch: boolean;
+            requestId: string;
+            timestamp: number;
+        }>;
+        queryResultPatched: _reduxjs_toolkit.ActionCreatorWithPreparedPayload<[payload: QuerySubstateIdentifier & {
+            patches: readonly Patch[];
+        }], QuerySubstateIdentifier & {
+            patches: readonly Patch[];
+        }, `${string}/queries/queryResultPatched`, never, unknown>;
+        middlewareRegistered: _reduxjs_toolkit.ActionCreatorWithPayload<string, `${string}/config/middlewareRegistered`>;
+    };
+};
+type SliceActions = ReturnType<typeof buildSlice>['actions'];
 
-export { type ActionCreatorInvariantMiddlewareOptions, type ActionCreatorWithNonInferrablePayload, type ActionCreatorWithOptionalPayload, type ActionCreatorWithPayload, type ActionCreatorWithPreparedPayload, type ActionCreatorWithoutPayload, type ActionMatchingAllOf, type ActionMatchingAnyOf, type ActionReducerMapBuilder, type Actions, type AddMiddleware, type AnyListenerPredicate, type AsyncTaskExecutor, type AsyncThunk, type AsyncThunkAction, type AsyncThunkConfig, type AsyncThunkDispatchConfig, type AsyncThunkOptions, type AsyncThunkPayloadCreator, type AsyncThunkPayloadCreatorReturnValue, type AsyncThunkReducers, type AutoBatchOptions, type CaseReducer, type CaseReducerActions, type CaseReducerWithPrepare, type CaseReducers, type CombinedSliceReducer, type Comparer, type ConfigureStoreOptions, type CreateAsyncThunkFunction, type CreateListenerMiddlewareOptions, type CreateSliceOptions, type DevToolsEnhancerOptions, type DynamicDispatch, type DynamicMiddlewareInstance, type EnhancedStore, type EntityAdapter, type EntityId, type EntitySelectors, type EntityState, type EntityStateAdapter, type ForkedTask, type ForkedTaskAPI, type ForkedTaskExecutor, type GetDispatchType as GetDispatch, type GetState, type GetThunkAPI, type IdSelector, type ImmutableStateInvariantMiddlewareOptions, type ListenerEffect, type ListenerEffectAPI, type ListenerErrorHandler, type ListenerMiddleware, type ListenerMiddlewareInstance, type MiddlewareApiConfig, type PayloadAction, type PayloadActionCreator, type PrepareAction, type ReducerCreators, ReducerType, SHOULD_AUTOBATCH, type SafePromise, type SerializableStateInvariantMiddlewareOptions, type SerializedError, type Slice, type SliceCaseReducers, type SliceSelectors, type SyncTaskExecutor, type ExtractDispatchExtensions as TSHelpersExtractDispatchExtensions, TaskAbortError, type TaskCancelled, type TaskRejected, type TaskResolved, type TaskResult, Tuple, type TypedAddListener, type TypedRemoveListener, type TypedStartListening, type TypedStopListening, type UnsubscribeListener, type UnsubscribeListenerOptions, type Update, type ValidateSliceCaseReducers, type WithSlice, addListener, asyncThunkCreator, autoBatchEnhancer, buildCreateSlice, clearAllListeners, combineSlices, configureStore, createAction, createActionCreatorInvariantMiddleware, createAsyncThunk, createDraftSafeSelector, createDraftSafeSelectorCreator, createDynamicMiddleware, createEntityAdapter, createImmutableStateInvariantMiddleware, createListenerMiddleware, createReducer, createSerializableStateInvariantMiddleware, createSlice, findNonSerializableValue, formatProdErrorMessage, isActionCreator, isAllOf, isAnyOf, isAsyncThunkAction, isFSA as isFluxStandardAction, isFulfilled, isImmutableDefault, isPending, isPlain, isRejected, isRejectedWithValue, miniSerializeError, nanoid, prepareAutoBatched, removeListener, unwrapResult };
+declare const onFocus: ActionCreatorWithoutPayload<"__rtkq/focused">;
+declare const onFocusLost: ActionCreatorWithoutPayload<"__rtkq/unfocused">;
+declare const onOnline: ActionCreatorWithoutPayload<"__rtkq/online">;
+declare const onOffline: ActionCreatorWithoutPayload<"__rtkq/offline">;
+/**
+ * A utility used to enable `refetchOnMount` and `refetchOnReconnect` behaviors.
+ * It requires the dispatch method from your store.
+ * Calling `setupListeners(store.dispatch)` will configure listeners with the recommended defaults,
+ * but you have the option of providing a callback for more granular control.
+ *
+ * @example
+ * ```ts
+ * setupListeners(store.dispatch)
+ * ```
+ *
+ * @param dispatch - The dispatch method from your store
+ * @param customHandler - An optional callback for more granular control over listener behavior
+ * @returns Return value of the handler.
+ * The default handler returns an `unsubscribe` method that can be called to remove the listeners.
+ */
+declare function setupListeners(dispatch: ThunkDispatch<any, any, any>, customHandler?: (dispatch: ThunkDispatch<any, any, any>, actions: {
+    onFocus: typeof onFocus;
+    onFocusLost: typeof onFocusLost;
+    onOnline: typeof onOnline;
+    onOffline: typeof onOffline;
+}) => () => void): () => void;
+
+/**
+ * Note: this file should import all other files for type discovery and declaration merging
+ */
+
+/**
+ * `ifOlderThan` - (default: `false` | `number`) - _number is value in seconds_
+ * - If specified, it will only run the query if the difference between `new Date()` and the last `fulfilledTimeStamp` is greater than the given value
+ *
+ * @overloadSummary
+ * `force`
+ * - If `force: true`, it will ignore the `ifOlderThan` value if it is set and the query will be run even if it exists in the cache.
+ */
+type PrefetchOptions = {
+    ifOlderThan?: false | number;
+} | {
+    force?: boolean;
+};
+export declare const coreModuleName: unique symbol;
+type CoreModule = typeof coreModuleName | ReferenceCacheLifecycle | ReferenceQueryLifecycle | ReferenceCacheCollection;
+type ThunkWithReturnValue<T> = ThunkAction<T, any, any, UnknownAction>;
+interface ApiModules<BaseQuery extends BaseQueryFn, Definitions extends EndpointDefinitions, ReducerPath extends string, TagTypes extends string> {
+    [coreModuleName]: {
+        /**
+         * This api's reducer should be mounted at `store[api.reducerPath]`.
+         *
+         * @example
+         * ```ts
+         * configureStore({
+         *   reducer: {
+         *     [api.reducerPath]: api.reducer,
+         *   },
+         *   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+         * })
+         * ```
+         */
+        reducerPath: ReducerPath;
+        /**
+         * Internal actions not part of the public API. Note: These are subject to change at any given time.
+         */
+        internalActions: InternalActions;
+        /**
+         *  A standard redux reducer that enables core functionality. Make sure it's included in your store.
+         *
+         * @example
+         * ```ts
+         * configureStore({
+         *   reducer: {
+         *     [api.reducerPath]: api.reducer,
+         *   },
+         *   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+         * })
+         * ```
+         */
+        reducer: Reducer<CombinedState<Definitions, TagTypes, ReducerPath>, UnknownAction>;
+        /**
+         * This is a standard redux middleware and is responsible for things like polling, garbage collection and a handful of other things. Make sure it's included in your store.
+         *
+         * @example
+         * ```ts
+         * configureStore({
+         *   reducer: {
+         *     [api.reducerPath]: api.reducer,
+         *   },
+         *   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+         * })
+         * ```
+         */
+        middleware: Middleware<{}, RootState<Definitions, string, ReducerPath>, ThunkDispatch<any, any, UnknownAction>>;
+        /**
+         * A collection of utility thunks for various situations.
+         */
+        util: {
+            /**
+             * A thunk that (if dispatched) will return a specific running query, identified
+             * by `endpointName` and `arg`.
+             * If that query is not running, dispatching the thunk will result in `undefined`.
+             *
+             * Can be used to await a specific query triggered in any way,
+             * including via hook calls or manually dispatching `initiate` actions.
+             *
+             * See https://redux-toolkit.js.org/rtk-query/usage/server-side-rendering for details.
+             */
+            getRunningQueryThunk<EndpointName extends AllQueryKeys<Definitions>>(endpointName: EndpointName, arg: QueryArgFromAnyQueryDefinition<Definitions, EndpointName>): ThunkWithReturnValue<QueryActionCreatorResult<Definitions[EndpointName] & {
+                type: 'query';
+            }> | InfiniteQueryActionCreatorResult<Definitions[EndpointName] & {
+                type: 'infinitequery';
+            }> | undefined>;
+            /**
+             * A thunk that (if dispatched) will return a specific running mutation, identified
+             * by `endpointName` and `fixedCacheKey` or `requestId`.
+             * If that mutation is not running, dispatching the thunk will result in `undefined`.
+             *
+             * Can be used to await a specific mutation triggered in any way,
+             * including via hook trigger functions or manually dispatching `initiate` actions.
+             *
+             * See https://redux-toolkit.js.org/rtk-query/usage/server-side-rendering for details.
+             */
+            getRunningMutationThunk<EndpointName extends MutationKeys<Definitions>>(endpointName: EndpointName, fixedCacheKeyOrRequestId: string): ThunkWithReturnValue<MutationActionCreatorResult<Definitions[EndpointName] & {
+                type: 'mutation';
+            }> | undefined>;
+            /**
+             * A thunk that (if dispatched) will return all running queries.
+             *
+             * Useful for SSR scenarios to await all running queries triggered in any way,
+             * including via hook calls or manually dispatching `initiate` actions.
+             *
+             * See https://redux-toolkit.js.org/rtk-query/usage/server-side-rendering for details.
+             */
+            getRunningQueriesThunk(): ThunkWithReturnValue<Array<QueryActionCreatorResult<any> | InfiniteQueryActionCreatorResult<any>>>;
+            /**
+             * A thunk that (if dispatched) will return all running mutations.
+             *
+             * Useful for SSR scenarios to await all running mutations triggered in any way,
+             * including via hook calls or manually dispatching `initiate` actions.
+             *
+             * See https://redux-toolkit.js.org/rtk-query/usage/server-side-rendering for details.
+             */
+            getRunningMutationsThunk(): ThunkWithReturnValue<Array<MutationActionCreatorResult<any>>>;
+            /**
+             * A Redux thunk that can be used to manually trigger pre-fetching of data.
+             *
+             * The thunk accepts three arguments: the name of the endpoint we are updating (such as `'getPost'`), the appropriate query arg values to construct the desired cache key, and a set of options used to determine if the data actually should be re-fetched based on cache staleness.
+             *
+             * React Hooks users will most likely never need to use this directly, as the `usePrefetch` hook will dispatch this thunk internally as needed when you call the prefetching function supplied by the hook.
+             *
+             * @example
+             *
+             * ```ts no-transpile
+             * dispatch(api.util.prefetch('getPosts', undefined, { force: true }))
+             * ```
+             */
+            prefetch<EndpointName extends QueryKeys<Definitions>>(endpointName: EndpointName, arg: QueryArgFrom<Definitions[EndpointName]>, options: PrefetchOptions): ThunkAction<void, any, any, UnknownAction>;
+            /**
+             * A Redux thunk action creator that, when dispatched, creates and applies a set of JSON diff/patch objects to the current state. This immediately updates the Redux state with those changes.
+             *
+             * The thunk action creator accepts three arguments: the name of the endpoint we are updating (such as `'getPost'`), the appropriate query arg values to construct the desired cache key, and an `updateRecipe` callback function. The callback receives an Immer-wrapped `draft` of the current state, and may modify the draft to match the expected results after the mutation completes successfully.
+             *
+             * The thunk executes _synchronously_, and returns an object containing `{patches: Patch[], inversePatches: Patch[], undo: () => void}`. The `patches` and `inversePatches` are generated using Immer's [`produceWithPatches` method](https://immerjs.github.io/immer/patches).
+             *
+             * This is typically used as the first step in implementing optimistic updates. The generated `inversePatches` can be used to revert the updates by calling `dispatch(patchQueryData(endpointName, arg, inversePatches))`. Alternatively, the `undo` method can be called directly to achieve the same effect.
+             *
+             * Note that the first two arguments (`endpointName` and `arg`) are used to determine which existing cache entry to update. If no existing cache entry is found, the `updateRecipe` callback will not run.
+             *
+             * @example
+             *
+             * ```ts
+             * const patchCollection = dispatch(
+             *   api.util.updateQueryData('getPosts', undefined, (draftPosts) => {
+             *     draftPosts.push({ id: 1, name: 'Teddy' })
+             *   })
+             * )
+             * ```
+             */
+            updateQueryData: UpdateQueryDataThunk<Definitions, RootState<Definitions, string, ReducerPath>>;
+            /**
+             * A Redux thunk action creator that, when dispatched, acts as an artificial API request to upsert a value into the cache.
+             *
+             * The thunk action creator accepts three arguments: the name of the endpoint we are updating (such as `'getPost'`), the appropriate query arg values to construct the desired cache key, and the data to upsert.
+             *
+             * If no cache entry for that cache key exists, a cache entry will be created and the data added. If a cache entry already exists, this will _overwrite_ the existing cache entry data.
+             *
+             * The thunk executes _asynchronously_, and returns a promise that resolves when the store has been updated.
+             *
+             * If dispatched while an actual request is in progress, both the upsert and request will be handled as soon as they resolve, resulting in a "last result wins" update behavior.
+             *
+             * @example
+             *
+             * ```ts
+             * await dispatch(
+             *   api.util.upsertQueryData('getPost', {id: 1}, {id: 1, text: "Hello!"})
+             * )
+             * ```
+             */
+            upsertQueryData: UpsertQueryDataThunk<Definitions, RootState<Definitions, string, ReducerPath>>;
+            /**
+             * A Redux thunk that applies a JSON diff/patch array to the cached data for a given query result. This immediately updates the Redux state with those changes.
+             *
+             * The thunk accepts three arguments: the name of the endpoint we are updating (such as `'getPost'`), the appropriate query arg values to construct the desired cache key, and a JSON diff/patch array as produced by Immer's `produceWithPatches`.
+             *
+             * This is typically used as the second step in implementing optimistic updates. If a request fails, the optimistically-applied changes can be reverted by dispatching `patchQueryData` with the `inversePatches` that were generated by `updateQueryData` earlier.
+             *
+             * In cases where it is desired to simply revert the previous changes, it may be preferable to call the `undo` method returned from dispatching `updateQueryData` instead.
+             *
+             * @example
+             * ```ts
+             * const patchCollection = dispatch(
+             *   api.util.updateQueryData('getPosts', undefined, (draftPosts) => {
+             *     draftPosts.push({ id: 1, name: 'Teddy' })
+             *   })
+             * )
+             *
+             * // later
+             * dispatch(
+             *   api.util.patchQueryData('getPosts', undefined, patchCollection.inversePatches)
+             * )
+             *
+             * // or
+             * patchCollection.undo()
+             * ```
+             */
+            patchQueryData: PatchQueryDataThunk<Definitions, RootState<Definitions, string, ReducerPath>>;
+            /**
+             * A Redux action creator that can be dispatched to manually reset the api state completely. This will immediately remove all existing cache entries, and all queries will be considered 'uninitialized'.
+             *
+             * @example
+             *
+             * ```ts
+             * dispatch(api.util.resetApiState())
+             * ```
+             */
+            resetApiState: SliceActions['resetApiState'];
+            upsertQueryEntries: UpsertEntries<Definitions>;
+            /**
+             * A Redux action creator that can be used to manually invalidate cache tags for [automated re-fetching](../../usage/automated-refetching.mdx).
+             *
+             * The action creator accepts one argument: the cache tags to be invalidated. It returns an action with those tags as a payload, and the corresponding `invalidateTags` action type for the api.
+             *
+             * Dispatching the result of this action creator will [invalidate](../../usage/automated-refetching.mdx#invalidating-cache-data) the given tags, causing queries to automatically re-fetch if they are subscribed to cache data that [provides](../../usage/automated-refetching.mdx#providing-cache-data) the corresponding tags.
+             *
+             * The array of tags provided to the action creator should be in one of the following formats, where `TagType` is equal to a string provided to the [`tagTypes`](../createApi.mdx#tagtypes) property of the api:
+             *
+             * - `[TagType]`
+             * - `[{ type: TagType }]`
+             * - `[{ type: TagType, id: number | string }]`
+             *
+             * @example
+             *
+             * ```ts
+             * dispatch(api.util.invalidateTags(['Post']))
+             * dispatch(api.util.invalidateTags([{ type: 'Post', id: 1 }]))
+             * dispatch(
+             *   api.util.invalidateTags([
+             *     { type: 'Post', id: 1 },
+             *     { type: 'Post', id: 'LIST' },
+             *   ])
+             * )
+             * ```
+             */
+            invalidateTags: ActionCreatorWithPayload<Array<TagDescription<TagTypes> | null | undefined>, string>;
+            /**
+             * A function to select all `{ endpointName, originalArgs, queryCacheKey }` combinations that would be invalidated by a specific set of tags.
+             *
+             * Can be used for mutations that want to do optimistic updates instead of invalidating a set of tags, but don't know exactly what they need to update.
+             */
+            selectInvalidatedBy: (state: RootState<Definitions, string, ReducerPath>, tags: ReadonlyArray<TagDescription<TagTypes> | null | undefined>) => Array<{
+                endpointName: string;
+                originalArgs: any;
+                queryCacheKey: string;
+            }>;
+            /**
+             * A function to select all arguments currently cached for a given endpoint.
+             *
+             * Can be used for mutations that want to do optimistic updates instead of invalidating a set of tags, but don't know exactly what they need to update.
+             */
+            selectCachedArgsForQuery: <QueryName extends AllQueryKeys<Definitions>>(state: RootState<Definitions, string, ReducerPath>, queryName: QueryName) => Array<QueryArgFromAnyQuery<Definitions[QueryName]>>;
+        };
+        /**
+         * Endpoints based on the input endpoints provided to `createApi`, containing `select` and `action matchers`.
+         */
+        endpoints: {
+            [K in keyof Definitions]: Definitions[K] extends QueryDefinition<any, any, any, any, any> ? ApiEndpointQuery<Definitions[K], Definitions> : Definitions[K] extends MutationDefinition<any, any, any, any, any> ? ApiEndpointMutation<Definitions[K], Definitions> : Definitions[K] extends InfiniteQueryDefinition<any, any, any, any, any> ? ApiEndpointInfiniteQuery<Definitions[K], Definitions> : never;
+        };
+    };
+}
+interface ApiEndpointQuery<Definition extends QueryDefinition<any, any, any, any, any>, Definitions extends EndpointDefinitions> extends BuildThunksApiEndpointQuery<Definition>, BuildInitiateApiEndpointQuery<Definition>, BuildSelectorsApiEndpointQuery<Definition, Definitions> {
+    name: string;
+    /**
+     * All of these are `undefined` at runtime, purely to be used in TypeScript declarations!
+     */
+    Types: NonNullable<Definition['Types']>;
+}
+interface ApiEndpointInfiniteQuery<Definition extends InfiniteQueryDefinition<any, any, any, any, any>, Definitions extends EndpointDefinitions> extends BuildThunksApiEndpointInfiniteQuery<Definition>, BuildInitiateApiEndpointInfiniteQuery<Definition>, BuildSelectorsApiEndpointInfiniteQuery<Definition, Definitions> {
+    name: string;
+    /**
+     * All of these are `undefined` at runtime, purely to be used in TypeScript declarations!
+     */
+    Types: NonNullable<Definition['Types']>;
+}
+interface ApiEndpointMutation<Definition extends MutationDefinition<any, any, any, any, any>, Definitions extends EndpointDefinitions> extends BuildThunksApiEndpointMutation<Definition>, BuildInitiateApiEndpointMutation<Definition>, BuildSelectorsApiEndpointMutation<Definition, Definitions> {
+    name: string;
+    /**
+     * All of these are `undefined` at runtime, purely to be used in TypeScript declarations!
+     */
+    Types: NonNullable<Definition['Types']>;
+}
+type ListenerActions = {
+    /**
+     * Will cause the RTK Query middleware to trigger any refetchOnReconnect-related behavior
+     * @link https://redux-toolkit.js.org/rtk-query/api/setupListeners
+     */
+    onOnline: typeof onOnline;
+    onOffline: typeof onOffline;
+    /**
+     * Will cause the RTK Query middleware to trigger any refetchOnFocus-related behavior
+     * @link https://redux-toolkit.js.org/rtk-query/api/setupListeners
+     */
+    onFocus: typeof onFocus;
+    onFocusLost: typeof onFocusLost;
+};
+type InternalActions = SliceActions & ListenerActions;
+interface CoreModuleOptions {
+    /**
+     * A selector creator (usually from `reselect`, or matching the same signature)
+     */
+    createSelector?: typeof createSelector;
+}
+/**
+ * Creates a module containing the basic redux logic for use with `buildCreateApi`.
+ *
+ * @example
+ * ```ts
+ * const createBaseApi = buildCreateApi(coreModule());
+ * ```
+ */
+declare const coreModule: ({ createSelector, }?: CoreModuleOptions) => Module<CoreModule>;
+
+declare const createApi: CreateApi<typeof coreModuleName>;
+
+type ModuleName = keyof ApiModules<any, any, any, any>;
+type Module<Name extends ModuleName> = {
+    name: Name;
+    init<BaseQuery extends BaseQueryFn, Definitions extends EndpointDefinitions, ReducerPath extends string, TagTypes extends string>(api: Api<BaseQuery, EndpointDefinitions, ReducerPath, TagTypes, ModuleName>, options: WithRequiredProp<CreateApiOptions<BaseQuery, Definitions, ReducerPath, TagTypes>, 'reducerPath' | 'serializeQueryArgs' | 'keepUnusedDataFor' | 'refetchOnMountOrArgChange' | 'refetchOnFocus' | 'refetchOnReconnect' | 'invalidationBehavior' | 'tagTypes'>, context: ApiContext<Definitions>): {
+        injectEndpoint(endpointName: string, definition: EndpointDefinition<any, any, any, any>): void;
+    };
+};
+interface ApiContext<Definitions extends EndpointDefinitions> {
+    apiUid: string;
+    endpointDefinitions: Definitions;
+    batch(cb: () => void): void;
+    extractRehydrationInfo: (action: UnknownAction) => CombinedState<any, any, any> | undefined;
+    hasRehydrationInfo: (action: UnknownAction) => boolean;
+}
+type Api<BaseQuery extends BaseQueryFn, Definitions extends EndpointDefinitions, ReducerPath extends string, TagTypes extends string, Enhancers extends ModuleName = CoreModule> = UnionToIntersection<ApiModules<BaseQuery, Definitions, ReducerPath, TagTypes>[Enhancers]> & {
+    /**
+     * A function to inject the endpoints into the original API, but also give you that same API with correct types for these endpoints back. Useful with code-splitting.
+     */
+    injectEndpoints<NewDefinitions extends EndpointDefinitions>(_: {
+        endpoints: (build: EndpointBuilder<BaseQuery, TagTypes, ReducerPath>) => NewDefinitions;
+        /**
+         * Optionally allows endpoints to be overridden if defined by multiple `injectEndpoints` calls.
+         *
+         * If set to `true`, will override existing endpoints with the new definition.
+         * If set to `'throw'`, will throw an error if an endpoint is redefined with a different definition.
+         * If set to `false` (or unset), will not override existing endpoints with the new definition, and log a warning in development.
+         */
+        overrideExisting?: boolean | 'throw';
+    }): Api<BaseQuery, Definitions & NewDefinitions, ReducerPath, TagTypes, Enhancers>;
+    /**
+     *A function to enhance a generated API with additional information. Useful with code-generation.
+     */
+    enhanceEndpoints<NewTagTypes extends string = never, NewDefinitions extends EndpointDefinitions = never>(_: {
+        addTagTypes?: readonly NewTagTypes[];
+        endpoints?: UpdateDefinitions<Definitions, TagTypes | NoInfer<NewTagTypes>, NewDefinitions> extends infer NewDefinitions ? {
+            [K in keyof NewDefinitions]?: Partial<NewDefinitions[K]> | ((definition: NewDefinitions[K]) => void);
+        } : never;
+    }): Api<BaseQuery, UpdateDefinitions<Definitions, TagTypes | NewTagTypes, NewDefinitions>, ReducerPath, TagTypes | NewTagTypes, Enhancers>;
+};
+
+type PromiseWithKnownReason<T, R> = Omit<Promise<T>, 'then' | 'catch'> & {
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: R) => TResult2 | PromiseLike<TResult2>) | undefined | null): Promise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: R) => TResult | PromiseLike<TResult>) | undefined | null): Promise<T | TResult>;
+};
+
+type ReferenceCacheCollection = never;
+/**
+ * @example
+   * ```ts
+   * // codeblock-meta title="keepUnusedDataFor example"
+   * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+   * interface Post {
+   *   id: number
+   *   name: string
+   * }
+   * type PostsResponse = Post[]
+   *
+   * const api = createApi({
+   *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+   *   endpoints: (build) => ({
+   *     getPosts: build.query<PostsResponse, void>({
+   *       query: () => 'posts',
+   *       // highlight-start
+   *       keepUnusedDataFor: 5
+   *       // highlight-end
+   *     })
+   *   })
+   * })
+   * ```
+ */
+type CacheCollectionQueryExtraOptions = {
+    /**
+     * Overrides the api-wide definition of `keepUnusedDataFor` for this endpoint only. _(This value is in seconds.)_
+     *
+     * This is how long RTK Query will keep your data cached for **after** the last component unsubscribes. For example, if you query an endpoint, then unmount the component, then mount another component that makes the same request within the given time frame, the most recent value will be served from the cache.
+     */
+    keepUnusedDataFor?: number;
+};
+
+export declare const _NEVER: unique symbol;
+type NEVER = typeof _NEVER;
+/**
+ * Creates a "fake" baseQuery to be used if your api *only* uses the `queryFn` definition syntax.
+ * This also allows you to specify a specific error type to be shared by all your `queryFn` definitions.
+ */
+declare function fakeBaseQuery<ErrorType>(): BaseQueryFn<void, NEVER, ErrorType, {}>;
+
+declare class NamedSchemaError extends SchemaError {
+    readonly value: any;
+    readonly schemaName: `${SchemaType}Schema`;
+    readonly _bqMeta: any;
+    constructor(issues: readonly StandardSchemaV1.Issue[], value: any, schemaName: `${SchemaType}Schema`, _bqMeta: any);
+}
+
+declare const rawResultType: unique symbol;
+declare const resultType: unique symbol;
+declare const baseQuery: unique symbol;
+interface SchemaFailureInfo {
+    endpoint: string;
+    arg: any;
+    type: 'query' | 'mutation';
+    queryCacheKey?: string;
+}
+type SchemaFailureHandler = (error: NamedSchemaError, info: SchemaFailureInfo) => void;
+type SchemaFailureConverter<BaseQuery extends BaseQueryFn> = (error: NamedSchemaError, info: SchemaFailureInfo) => BaseQueryError<BaseQuery>;
+type EndpointDefinitionWithQuery<QueryArg, BaseQuery extends BaseQueryFn, ResultType, RawResultType extends BaseQueryResult<BaseQuery>> = {
+    /**
+     * `query` can be a function that returns either a `string` or an `object` which is passed to your `baseQuery`. If you are using [fetchBaseQuery](./fetchBaseQuery), this can return either a `string` or an `object` of properties in `FetchArgs`. If you use your own custom [`baseQuery`](../../rtk-query/usage/customizing-queries), you can customize this behavior to your liking.
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="query example"
+     *
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     * type PostsResponse = Post[]
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   tagTypes: ['Post'],
+     *   endpoints: (build) => ({
+     *     getPosts: build.query<PostsResponse, void>({
+     *       // highlight-start
+     *       query: () => 'posts',
+     *       // highlight-end
+     *     }),
+     *     addPost: build.mutation<Post, Partial<Post>>({
+     *      // highlight-start
+     *      query: (body) => ({
+     *        url: `posts`,
+     *        method: 'POST',
+     *        body,
+     *      }),
+     *      // highlight-end
+     *      invalidatesTags: [{ type: 'Post', id: 'LIST' }],
+     *    }),
+     *   })
+     * })
+     * ```
+     */
+    query(arg: QueryArg): BaseQueryArg<BaseQuery>;
+    queryFn?: never;
+    /**
+     * A function to manipulate the data returned by a query or mutation.
+     */
+    transformResponse?(baseQueryReturnValue: RawResultType, meta: BaseQueryMeta<BaseQuery>, arg: QueryArg): ResultType | Promise<ResultType>;
+    /**
+     * A function to manipulate the data returned by a failed query or mutation.
+     */
+    transformErrorResponse?(baseQueryReturnValue: BaseQueryError<BaseQuery>, meta: BaseQueryMeta<BaseQuery>, arg: QueryArg): unknown;
+    /**
+     * A schema for the result *before* it's passed to `transformResponse`.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const postSchema = v.object({ id: v.number(), name: v.string() })
+     * type Post = v.InferOutput<typeof postSchema>
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPostName: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       rawResponseSchema: postSchema,
+     *       transformResponse: (post) => post.name,
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    rawResponseSchema?: StandardSchemaV1<RawResultType>;
+    /**
+     * A schema for the error object returned by the `query` or `queryFn`, *before* it's passed to `transformErrorResponse`.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     * import {customBaseQuery, baseQueryErrorSchema} from "./customBaseQuery"
+     *
+     * const api = createApi({
+     *   baseQuery: customBaseQuery,
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       rawErrorResponseSchema: baseQueryErrorSchema,
+     *       transformErrorResponse: (error) => error.data,
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    rawErrorResponseSchema?: StandardSchemaV1<BaseQueryError<BaseQuery>>;
+};
+type EndpointDefinitionWithQueryFn<QueryArg, BaseQuery extends BaseQueryFn, ResultType> = {
+    /**
+     * Can be used in place of `query` as an inline function that bypasses `baseQuery` completely for the endpoint.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta title="Basic queryFn example"
+     *
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     * type PostsResponse = Post[]
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPosts: build.query<PostsResponse, void>({
+     *       query: () => 'posts',
+     *     }),
+     *     flipCoin: build.query<'heads' | 'tails', void>({
+     *       // highlight-start
+     *       queryFn(arg, queryApi, extraOptions, baseQuery) {
+     *         const randomVal = Math.random()
+     *         if (randomVal < 0.45) {
+     *           return { data: 'heads' }
+     *         }
+     *         if (randomVal < 0.9) {
+     *           return { data: 'tails' }
+     *         }
+     *         return { error: { status: 500, statusText: 'Internal Server Error', data: "Coin landed on its edge!" } }
+     *       }
+     *       // highlight-end
+     *     })
+     *   })
+     * })
+     * ```
+     */
+    queryFn(arg: QueryArg, api: BaseQueryApi, extraOptions: BaseQueryExtraOptions<BaseQuery>, baseQuery: (arg: Parameters<BaseQuery>[0]) => ReturnType<BaseQuery>): MaybePromise<QueryReturnValue<ResultType, BaseQueryError<BaseQuery>, BaseQueryMeta<BaseQuery>>>;
+    query?: never;
+    transformResponse?: never;
+    transformErrorResponse?: never;
+    rawResponseSchema?: never;
+    rawErrorResponseSchema?: never;
+};
+type BaseEndpointTypes<QueryArg, BaseQuery extends BaseQueryFn, ResultType, RawResultType> = {
+    QueryArg: QueryArg;
+    BaseQuery: BaseQuery;
+    ResultType: ResultType;
+    RawResultType: RawResultType;
+};
+type SchemaType = 'arg' | 'rawResponse' | 'response' | 'rawErrorResponse' | 'errorResponse' | 'meta';
+interface CommonEndpointDefinition<QueryArg, BaseQuery extends BaseQueryFn, ResultType> {
+    /**
+     * A schema for the arguments to be passed to the `query` or `queryFn`.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       argSchema: v.object({ id: v.number() }),
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    argSchema?: StandardSchemaV1<QueryArg>;
+    /**
+     * A schema for the result (including `transformResponse` if provided).
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const postSchema = v.object({ id: v.number(), name: v.string() })
+     * type Post = v.InferOutput<typeof postSchema>
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       responseSchema: postSchema,
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    responseSchema?: StandardSchemaV1<ResultType>;
+    /**
+     * A schema for the error object returned by the `query` or `queryFn` (including `transformErrorResponse` if provided).
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     * import { customBaseQuery, baseQueryErrorSchema } from "./customBaseQuery"
+     *
+     * const api = createApi({
+     *   baseQuery: customBaseQuery,
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       errorResponseSchema: baseQueryErrorSchema,
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    errorResponseSchema?: StandardSchemaV1<BaseQueryError<BaseQuery>>;
+    /**
+     * A schema for the `meta` property returned by the `query` or `queryFn`.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     * import { customBaseQuery, baseQueryMetaSchema } from "./customBaseQuery"
+     *
+     * const api = createApi({
+     *   baseQuery: customBaseQuery,
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       metaSchema: baseQueryMetaSchema,
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    metaSchema?: StandardSchemaV1<BaseQueryMeta<BaseQuery>>;
+    /**
+     * Defaults to `true`.
+     *
+     * Most apps should leave this setting on. The only time it can be a performance issue
+     * is if an API returns extremely large amounts of data (e.g. 10,000 rows per request) and
+     * you're unable to paginate it.
+     *
+     * For details of how this works, please see the below. When it is set to `false`,
+     * every request will cause subscribed components to rerender, even when the data has not changed.
+     *
+     * @see https://redux-toolkit.js.org/api/other-exports#copywithstructuralsharing
+     */
+    structuralSharing?: boolean;
+    /**
+     * A function that is called when a schema validation fails.
+     *
+     * Gets called with a `NamedSchemaError` and an object containing the endpoint name, the type of the endpoint, the argument passed to the endpoint, and the query cache key (if applicable).
+     *
+     * `NamedSchemaError` has the following properties:
+     * - `issues`: an array of issues that caused the validation to fail
+     * - `value`: the value that was passed to the schema
+     * - `schemaName`: the name of the schema that was used to validate the value (e.g. `argSchema`)
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       onSchemaFailure: (error, info) => {
+     *         console.error(error, info)
+     *       },
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    onSchemaFailure?: SchemaFailureHandler;
+    /**
+     * Convert a schema validation failure into an error shape matching base query errors.
+     *
+     * When not provided, schema failures are treated as fatal, and normal error handling such as tag invalidation will not be executed.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       responseSchema: v.object({ id: v.number(), name: v.string() }),
+     *       catchSchemaFailure: (error, info) => ({
+     *         status: "CUSTOM_ERROR",
+     *         error: error.schemaName + " failed validation",
+     *         data: error.issues,
+     *       }),
+     *     }),
+     *   }),
+     * })
+     * ```
+     */
+    catchSchemaFailure?: SchemaFailureConverter<BaseQuery>;
+    /**
+     * Defaults to `false`.
+     *
+     * If set to `true`, will skip schema validation for this endpoint.
+     * Overrides the global setting.
+     *
+     * Can be overridden for specific schemas by passing an array of schema types to skip.
+     *
+     * @example
+     * ```ts
+     * // codeblock-meta no-transpile
+     * import { createApi } from '@reduxjs/toolkit/query/react'
+     * import * as v from "valibot"
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   endpoints: (build) => ({
+     *     getPost: build.query<Post, { id: number }>({
+     *       query: ({ id }) => `/post/${id}`,
+     *       responseSchema: v.object({ id: v.number(), name: v.string() }),
+     *       skipSchemaValidation: process.env.NODE_ENV === "test" ? ["response"] : false, // skip schema validation for response in tests, since we'll be mocking the response
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    skipSchemaValidation?: boolean | SchemaType[];
+}
+type BaseEndpointDefinition<QueryArg, BaseQuery extends BaseQueryFn, ResultType, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = (([CastAny<BaseQueryResult<BaseQuery>, {}>] extends [NEVER] ? never : EndpointDefinitionWithQuery<QueryArg, BaseQuery, ResultType, RawResultType>) | EndpointDefinitionWithQueryFn<QueryArg, BaseQuery, ResultType>) & CommonEndpointDefinition<QueryArg, BaseQuery, ResultType> & {
+    [rawResultType]?: RawResultType;
+    [resultType]?: ResultType;
+    [baseQuery]?: BaseQuery;
+} & HasRequiredProps<BaseQueryExtraOptions<BaseQuery>, {
+    extraOptions: BaseQueryExtraOptions<BaseQuery>;
+}, {
+    extraOptions?: BaseQueryExtraOptions<BaseQuery>;
+}>;
+declare enum DefinitionType {
+    query = "query",
+    mutation = "mutation",
+    infinitequery = "infinitequery"
+}
+type TagDescriptionArray<TagTypes extends string> = ReadonlyArray<TagDescription<TagTypes> | undefined | null>;
+type GetResultDescriptionFn<TagTypes extends string, ResultType, QueryArg, ErrorType, MetaType> = (result: ResultType | undefined, error: ErrorType | undefined, arg: QueryArg, meta: MetaType) => TagDescriptionArray<TagTypes>;
+type FullTagDescription<TagType> = {
+    type: TagType;
+    id?: number | string;
+};
+type TagDescription<TagType> = TagType | FullTagDescription<TagType>;
+/**
+ * @public
+ */
+type ResultDescription<TagTypes extends string, ResultType, QueryArg, ErrorType, MetaType> = TagDescriptionArray<TagTypes> | GetResultDescriptionFn<TagTypes, ResultType, QueryArg, ErrorType, MetaType>;
+type QueryTypes<QueryArg, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = BaseEndpointTypes<QueryArg, BaseQuery, ResultType, RawResultType> & {
+    /**
+     * The endpoint definition type. To be used with some internal generic types.
+     * @example
+     * ```ts
+     * const useMyWrappedHook: UseQuery<typeof api.endpoints.query.Types.QueryDefinition> = ...
+     * ```
+     */
+    QueryDefinition: QueryDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath>;
+    TagTypes: TagTypes;
+    ReducerPath: ReducerPath;
+};
+/**
+ * @public
+ */
+interface QueryExtraOptions<TagTypes extends string, ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> extends CacheLifecycleQueryExtraOptions<ResultType, QueryArg, BaseQuery, ReducerPath>, QueryLifecycleQueryExtraOptions<ResultType, QueryArg, BaseQuery, ReducerPath>, CacheCollectionQueryExtraOptions {
+    type: DefinitionType.query;
+    /**
+     * Used by `query` endpoints. Determines which 'tag' is attached to the cached data returned by the query.
+     * Expects an array of tag type strings, an array of objects of tag types with ids, or a function that returns such an array.
+     * 1.  `['Post']` - equivalent to `2`
+     * 2.  `[{ type: 'Post' }]` - equivalent to `1`
+     * 3.  `[{ type: 'Post', id: 1 }]`
+     * 4.  `(result, error, arg) => ['Post']` - equivalent to `5`
+     * 5.  `(result, error, arg) => [{ type: 'Post' }]` - equivalent to `4`
+     * 6.  `(result, error, arg) => [{ type: 'Post', id: 1 }]`
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="providesTags example"
+     *
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     * type PostsResponse = Post[]
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   tagTypes: ['Posts'],
+     *   endpoints: (build) => ({
+     *     getPosts: build.query<PostsResponse, void>({
+     *       query: () => 'posts',
+     *       // highlight-start
+     *       providesTags: (result) =>
+     *         result
+     *           ? [
+     *               ...result.map(({ id }) => ({ type: 'Posts' as const, id })),
+     *               { type: 'Posts', id: 'LIST' },
+     *             ]
+     *           : [{ type: 'Posts', id: 'LIST' }],
+     *       // highlight-end
+     *     })
+     *   })
+     * })
+     * ```
+     */
+    providesTags?: ResultDescription<TagTypes, ResultType, QueryArg, BaseQueryError<BaseQuery>, BaseQueryMeta<BaseQuery>>;
+    /**
+     * Not to be used. A query should not invalidate tags in the cache.
+     */
+    invalidatesTags?: never;
+    /**
+     * Can be provided to return a custom cache key value based on the query arguments.
+     *
+     * This is primarily intended for cases where a non-serializable value is passed as part of the query arg object and should be excluded from the cache key.  It may also be used for cases where an endpoint should only have a single cache entry, such as an infinite loading / pagination implementation.
+     *
+     * Unlike the `createApi` version which can _only_ return a string, this per-endpoint option can also return an an object, number, or boolean.  If it returns a string, that value will be used as the cache key directly.  If it returns an object / number / boolean, that value will be passed to the built-in `defaultSerializeQueryArgs`.  This simplifies the use case of stripping out args you don't want included in the cache key.
+     *
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="serializeQueryArgs : exclude value"
+     *
+     * import { createApi, fetchBaseQuery, defaultSerializeQueryArgs } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     *
+     * interface MyApiClient {
+     *   fetchPost: (id: string) => Promise<Post>
+     * }
+     *
+     * createApi({
+     *  baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *  endpoints: (build) => ({
+     *    // Example: an endpoint with an API client passed in as an argument,
+     *    // but only the item ID should be used as the cache key
+     *    getPost: build.query<Post, { id: string; client: MyApiClient }>({
+     *      queryFn: async ({ id, client }) => {
+     *        const post = await client.fetchPost(id)
+     *        return { data: post }
+     *      },
+     *      // highlight-start
+     *      serializeQueryArgs: ({ queryArgs, endpointDefinition, endpointName }) => {
+     *        const { id } = queryArgs
+     *        // This can return a string, an object, a number, or a boolean.
+     *        // If it returns an object, number or boolean, that value
+     *        // will be serialized automatically via `defaultSerializeQueryArgs`
+     *        return { id } // omit `client` from the cache key
+     *
+     *        // Alternately, you can use `defaultSerializeQueryArgs` yourself:
+     *        // return defaultSerializeQueryArgs({
+     *        //   endpointName,
+     *        //   queryArgs: { id },
+     *        //   endpointDefinition
+     *        // })
+     *        // Or  create and return a string yourself:
+     *        // return `getPost(${id})`
+     *      },
+     *      // highlight-end
+     *    }),
+     *  }),
+     *})
+     * ```
+     */
+    serializeQueryArgs?: SerializeQueryArgs<QueryArg, string | number | boolean | Record<any, any>>;
+    /**
+     * Can be provided to merge an incoming response value into the current cache data.
+     * If supplied, no automatic structural sharing will be applied - it's up to
+     * you to update the cache appropriately.
+     *
+     * Since RTKQ normally replaces cache entries with the new response, you will usually
+     * need to use this with the `serializeQueryArgs` or `forceRefetch` options to keep
+     * an existing cache entry so that it can be updated.
+     *
+     * Since this is wrapped with Immer, you may either mutate the `currentCacheValue` directly,
+     * or return a new value, but _not_ both at once.
+     *
+     * Will only be called if the existing `currentCacheData` is _not_ `undefined` - on first response,
+     * the cache entry will just save the response data directly.
+     *
+     * Useful if you don't want a new request to completely override the current cache value,
+     * maybe because you have manually updated it from another source and don't want those
+     * updates to get lost.
+     *
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="merge: pagination"
+     *
+     * import { createApi, fetchBaseQuery, defaultSerializeQueryArgs } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     *
+     * createApi({
+     *  baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *  endpoints: (build) => ({
+     *    listItems: build.query<string[], number>({
+     *      query: (pageNumber) => `/listItems?page=${pageNumber}`,
+     *     // Only have one cache entry because the arg always maps to one string
+     *     serializeQueryArgs: ({ endpointName }) => {
+     *       return endpointName
+     *      },
+     *      // Always merge incoming data to the cache entry
+     *      merge: (currentCache, newItems) => {
+     *        currentCache.push(...newItems)
+     *      },
+     *      // Refetch when the page arg changes
+     *      forceRefetch({ currentArg, previousArg }) {
+     *        return currentArg !== previousArg
+     *      },
+     *    }),
+     *  }),
+     *})
+     * ```
+     */
+    merge?(currentCacheData: ResultType, responseData: ResultType, otherArgs: {
+        arg: QueryArg;
+        baseQueryMeta: BaseQueryMeta<BaseQuery>;
+        requestId: string;
+        fulfilledTimeStamp: number;
+    }): ResultType | void;
+    /**
+     * Check to see if the endpoint should force a refetch in cases where it normally wouldn't.
+     * This is primarily useful for "infinite scroll" / pagination use cases where
+     * RTKQ is keeping a single cache entry that is added to over time, in combination
+     * with `serializeQueryArgs` returning a fixed cache key and a `merge` callback
+     * set to add incoming data to the cache entry each time.
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="forceRefresh: pagination"
+     *
+     * import { createApi, fetchBaseQuery, defaultSerializeQueryArgs } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     *
+     * createApi({
+     *  baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *  endpoints: (build) => ({
+     *    listItems: build.query<string[], number>({
+     *      query: (pageNumber) => `/listItems?page=${pageNumber}`,
+     *     // Only have one cache entry because the arg always maps to one string
+     *     serializeQueryArgs: ({ endpointName }) => {
+     *       return endpointName
+     *      },
+     *      // Always merge incoming data to the cache entry
+     *      merge: (currentCache, newItems) => {
+     *        currentCache.push(...newItems)
+     *      },
+     *      // Refetch when the page arg changes
+     *      forceRefetch({ currentArg, previousArg }) {
+     *        return currentArg !== previousArg
+     *      },
+     *    }),
+     *  }),
+     *})
+     * ```
+     */
+    forceRefetch?(params: {
+        currentArg: QueryArg | undefined;
+        previousArg: QueryArg | undefined;
+        state: RootState<any, any, string>;
+        endpointState?: QuerySubState<any>;
+    }): boolean;
+    /**
+     * All of these are `undefined` at runtime, purely to be used in TypeScript declarations!
+     */
+    Types?: QueryTypes<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+}
+type QueryDefinition<QueryArg, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = BaseEndpointDefinition<QueryArg, BaseQuery, ResultType, RawResultType> & QueryExtraOptions<TagTypes, ResultType, QueryArg, BaseQuery, ReducerPath, RawResultType>;
+type InfiniteQueryTypes<QueryArg, PageParam, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = BaseEndpointTypes<QueryArg, BaseQuery, ResultType, RawResultType> & {
+    /**
+     * The endpoint definition type. To be used with some internal generic types.
+     * @example
+     * ```ts
+     * const useMyWrappedHook: UseQuery<typeof api.endpoints.query.Types.QueryDefinition> = ...
+     * ```
+     */
+    InfiniteQueryDefinition: InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery, TagTypes, ResultType, ReducerPath>;
+    TagTypes: TagTypes;
+    ReducerPath: ReducerPath;
+};
+interface InfiniteQueryExtraOptions<TagTypes extends string, ResultType, QueryArg, PageParam, BaseQuery extends BaseQueryFn, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> extends CacheLifecycleInfiniteQueryExtraOptions<InfiniteData<ResultType, PageParam>, QueryArg, BaseQuery, ReducerPath>, QueryLifecycleInfiniteQueryExtraOptions<InfiniteData<ResultType, PageParam>, QueryArg, BaseQuery, ReducerPath>, CacheCollectionQueryExtraOptions {
+    type: DefinitionType.infinitequery;
+    providesTags?: ResultDescription<TagTypes, InfiniteData<ResultType, PageParam>, QueryArg, BaseQueryError<BaseQuery>, BaseQueryMeta<BaseQuery>>;
+    /**
+     * Not to be used. A query should not invalidate tags in the cache.
+     */
+    invalidatesTags?: never;
+    /**
+     * Required options to configure the infinite query behavior.
+     * `initialPageParam` and `getNextPageParam` are required, to
+     * ensure the infinite query can properly fetch the next page of data.
+     * `initialPageParam` may be specified when using the
+     * endpoint, to override the default value.
+     * `maxPages` and `getPreviousPageParam` are both optional.
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="infiniteQueryOptions example"
+     * import { createApi, fetchBaseQuery, defaultSerializeQueryArgs } from '@reduxjs/toolkit/query/react'
+     *
+     * type Pokemon = {
+     *   id: string
+     *   name: string
+     * }
+     *
+     * const pokemonApi = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: 'https://pokeapi.co/api/v2/' }),
+     *   endpoints: (build) => ({
+     *     getInfinitePokemonWithMax: build.infiniteQuery<Pokemon[], string, number>({
+     *       infiniteQueryOptions: {
+     *         initialPageParam: 0,
+     *         maxPages: 3,
+     *         getNextPageParam: (lastPage, allPages, lastPageParam, allPageParams) =>
+     *           lastPageParam + 1,
+     *         getPreviousPageParam: (
+     *           firstPage,
+     *           allPages,
+     *           firstPageParam,
+     *           allPageParams,
+     *         ) => {
+     *           return firstPageParam > 0 ? firstPageParam - 1 : undefined
+     *         },
+     *       },
+     *       query({pageParam}) {
+     *         return `https://example.com/listItems?page=${pageParam}`
+     *       },
+     *     }),
+     *   }),
+     * })
+     
+     * ```
+     */
+    infiniteQueryOptions: InfiniteQueryConfigOptions<ResultType, PageParam, QueryArg>;
+    /**
+     * Can be provided to return a custom cache key value based on the query arguments.
+     *
+     * This is primarily intended for cases where a non-serializable value is passed as part of the query arg object and should be excluded from the cache key.  It may also be used for cases where an endpoint should only have a single cache entry, such as an infinite loading / pagination implementation.
+     *
+     * Unlike the `createApi` version which can _only_ return a string, this per-endpoint option can also return an an object, number, or boolean.  If it returns a string, that value will be used as the cache key directly.  If it returns an object / number / boolean, that value will be passed to the built-in `defaultSerializeQueryArgs`.  This simplifies the use case of stripping out args you don't want included in the cache key.
+     *
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="serializeQueryArgs : exclude value"
+     *
+     * import { createApi, fetchBaseQuery, defaultSerializeQueryArgs } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     *
+     * interface MyApiClient {
+     *   fetchPost: (id: string) => Promise<Post>
+     * }
+     *
+     * createApi({
+     *  baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *  endpoints: (build) => ({
+     *    // Example: an endpoint with an API client passed in as an argument,
+     *    // but only the item ID should be used as the cache key
+     *    getPost: build.query<Post, { id: string; client: MyApiClient }>({
+     *      queryFn: async ({ id, client }) => {
+     *        const post = await client.fetchPost(id)
+     *        return { data: post }
+     *      },
+     *      // highlight-start
+     *      serializeQueryArgs: ({ queryArgs, endpointDefinition, endpointName }) => {
+     *        const { id } = queryArgs
+     *        // This can return a string, an object, a number, or a boolean.
+     *        // If it returns an object, number or boolean, that value
+     *        // will be serialized automatically via `defaultSerializeQueryArgs`
+     *        return { id } // omit `client` from the cache key
+     *
+     *        // Alternately, you can use `defaultSerializeQueryArgs` yourself:
+     *        // return defaultSerializeQueryArgs({
+     *        //   endpointName,
+     *        //   queryArgs: { id },
+     *        //   endpointDefinition
+     *        // })
+     *        // Or  create and return a string yourself:
+     *        // return `getPost(${id})`
+     *      },
+     *      // highlight-end
+     *    }),
+     *  }),
+     *})
+     * ```
+     */
+    serializeQueryArgs?: SerializeQueryArgs<QueryArg, string | number | boolean | Record<any, any>>;
+    /**
+     * All of these are `undefined` at runtime, purely to be used in TypeScript declarations!
+     */
+    Types?: InfiniteQueryTypes<QueryArg, PageParam, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+}
+type InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = BaseEndpointDefinition<InfiniteQueryCombinedArg<QueryArg, PageParam>, BaseQuery, ResultType, RawResultType> & InfiniteQueryExtraOptions<TagTypes, ResultType, QueryArg, PageParam, BaseQuery, ReducerPath, RawResultType>;
+type MutationTypes<QueryArg, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = BaseEndpointTypes<QueryArg, BaseQuery, ResultType, RawResultType> & {
+    /**
+     * The endpoint definition type. To be used with some internal generic types.
+     * @example
+     * ```ts
+     * const useMyWrappedHook: UseMutation<typeof api.endpoints.query.Types.MutationDefinition> = ...
+     * ```
+     */
+    MutationDefinition: MutationDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath>;
+    TagTypes: TagTypes;
+    ReducerPath: ReducerPath;
+};
+/**
+ * @public
+ */
+interface MutationExtraOptions<TagTypes extends string, ResultType, QueryArg, BaseQuery extends BaseQueryFn, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> extends CacheLifecycleMutationExtraOptions<ResultType, QueryArg, BaseQuery, ReducerPath>, QueryLifecycleMutationExtraOptions<ResultType, QueryArg, BaseQuery, ReducerPath> {
+    type: DefinitionType.mutation;
+    /**
+     * Used by `mutation` endpoints. Determines which cached data should be either re-fetched or removed from the cache.
+     * Expects the same shapes as `providesTags`.
+     *
+     * @example
+     *
+     * ```ts
+     * // codeblock-meta title="invalidatesTags example"
+     * import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+     * interface Post {
+     *   id: number
+     *   name: string
+     * }
+     * type PostsResponse = Post[]
+     *
+     * const api = createApi({
+     *   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+     *   tagTypes: ['Posts'],
+     *   endpoints: (build) => ({
+     *     getPosts: build.query<PostsResponse, void>({
+     *       query: () => 'posts',
+     *       providesTags: (result) =>
+     *         result
+     *           ? [
+     *               ...result.map(({ id }) => ({ type: 'Posts' as const, id })),
+     *               { type: 'Posts', id: 'LIST' },
+     *             ]
+     *           : [{ type: 'Posts', id: 'LIST' }],
+     *     }),
+     *     addPost: build.mutation<Post, Partial<Post>>({
+     *       query(body) {
+     *         return {
+     *           url: `posts`,
+     *           method: 'POST',
+     *           body,
+     *         }
+     *       },
+     *       // highlight-start
+     *       invalidatesTags: [{ type: 'Posts', id: 'LIST' }],
+     *       // highlight-end
+     *     }),
+     *   })
+     * })
+     * ```
+     */
+    invalidatesTags?: ResultDescription<TagTypes, ResultType, QueryArg, BaseQueryError<BaseQuery>, BaseQueryMeta<BaseQuery>>;
+    /**
+     * Not to be used. A mutation should not provide tags to the cache.
+     */
+    providesTags?: never;
+    /**
+     * All of these are `undefined` at runtime, purely to be used in TypeScript declarations!
+     */
+    Types?: MutationTypes<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+}
+type MutationDefinition<QueryArg, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = BaseEndpointDefinition<QueryArg, BaseQuery, ResultType, RawResultType> & MutationExtraOptions<TagTypes, ResultType, QueryArg, BaseQuery, ReducerPath, RawResultType>;
+type EndpointDefinition<QueryArg, BaseQuery extends BaseQueryFn, TagTypes extends string, ResultType, ReducerPath extends string = string, PageParam = any, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>> = QueryDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType> | MutationDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType> | InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+type EndpointDefinitions = Record<string, EndpointDefinition<any, any, any, any, any, any, any>>;
+type EndpointBuilder<BaseQuery extends BaseQueryFn, TagTypes extends string, ReducerPath extends string> = {
+    /**
+     * An endpoint definition that retrieves data, and may provide tags to the cache.
+     *
+     * @example
+     * ```js
+     * // codeblock-meta title="Example of all query endpoint options"
+     * const api = createApi({
+     *  baseQuery,
+     *  endpoints: (build) => ({
+     *    getPost: build.query({
+     *      query: (id) => ({ url: `post/${id}` }),
+     *      // Pick out data and prevent nested properties in a hook or selector
+     *      transformResponse: (response) => response.data,
+     *      // Pick out error and prevent nested properties in a hook or selector
+     *      transformErrorResponse: (response) => response.error,
+     *      // `result` is the server response
+     *      providesTags: (result, error, id) => [{ type: 'Post', id }],
+     *      // trigger side effects or optimistic updates
+     *      onQueryStarted(id, { dispatch, getState, extra, requestId, queryFulfilled, getCacheEntry, updateCachedData }) {},
+     *      // handle subscriptions etc
+     *      onCacheEntryAdded(id, { dispatch, getState, extra, requestId, cacheEntryRemoved, cacheDataLoaded, getCacheEntry, updateCachedData }) {},
+     *    }),
+     *  }),
+     *});
+     *```
+     */
+    query<ResultType, QueryArg, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>>(definition: OmitFromUnion<QueryDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>, 'type'>): QueryDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+    /**
+     * An endpoint definition that alters data on the server or will possibly invalidate the cache.
+     *
+     * @example
+     * ```js
+     * // codeblock-meta title="Example of all mutation endpoint options"
+     * const api = createApi({
+     *   baseQuery,
+     *   endpoints: (build) => ({
+     *     updatePost: build.mutation({
+     *       query: ({ id, ...patch }) => ({ url: `post/${id}`, method: 'PATCH', body: patch }),
+     *       // Pick out data and prevent nested properties in a hook or selector
+     *       transformResponse: (response) => response.data,
+     *       // Pick out error and prevent nested properties in a hook or selector
+     *       transformErrorResponse: (response) => response.error,
+     *       // `result` is the server response
+     *       invalidatesTags: (result, error, id) => [{ type: 'Post', id }],
+     *      // trigger side effects or optimistic updates
+     *      onQueryStarted(id, { dispatch, getState, extra, requestId, queryFulfilled, getCacheEntry }) {},
+     *      // handle subscriptions etc
+     *      onCacheEntryAdded(id, { dispatch, getState, extra, requestId, cacheEntryRemoved, cacheDataLoaded, getCacheEntry }) {},
+     *     }),
+     *   }),
+     * });
+     * ```
+     */
+    mutation<ResultType, QueryArg, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>>(definition: OmitFromUnion<MutationDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>, 'type'>): MutationDefinition<QueryArg, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+    infiniteQuery<ResultType, QueryArg, PageParam, RawResultType extends BaseQueryResult<BaseQuery> = BaseQueryResult<BaseQuery>>(definition: OmitFromUnion<InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>, 'type'>): InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery, TagTypes, ResultType, ReducerPath, RawResultType>;
+};
+type AssertTagTypes = <T extends FullTagDescription<string>>(t: T) => T;
+type QueryArgFrom<D extends BaseEndpointDefinition<any, any, any, any>> = D extends BaseEndpointDefinition<infer QA, any, any, any> ? QA : never;
+type InfiniteQueryArgFrom<D extends BaseEndpointDefinition<any, any, any, any>> = D extends InfiniteQueryDefinition<infer QA, any, any, any, any, any, any> ? QA : never;
+type QueryArgFromAnyQuery<D extends BaseEndpointDefinition<any, any, any, any>> = D extends InfiniteQueryDefinition<any, any, any, any, any, any, any> ? InfiniteQueryArgFrom<D> : D extends QueryDefinition<any, any, any, any, any, any> ? QueryArgFrom<D> : never;
+type ResultTypeFrom<D extends BaseEndpointDefinition<any, any, any, any>> = D extends BaseEndpointDefinition<any, any, infer RT, any> ? RT : unknown;
+type ReducerPathFrom<D extends EndpointDefinition<any, any, any, any, any, any, any>> = D extends EndpointDefinition<any, any, any, any, infer RP, any, any> ? RP : unknown;
+type TagTypesFrom<D extends EndpointDefinition<any, any, any, any, any, any, any>> = D extends EndpointDefinition<any, any, infer TT, any, any, any, any> ? TT : unknown;
+type PageParamFrom<D extends InfiniteQueryDefinition<any, any, any, any, any, any, any>> = D extends InfiniteQueryDefinition<any, infer PP, any, any, any, any, any> ? PP : unknown;
+type InfiniteQueryCombinedArg<QueryArg, PageParam> = {
+    queryArg: QueryArg;
+    pageParam: PageParam;
+};
+type TagTypesFromApi<T> = T extends Api<any, any, any, infer TagTypes> ? TagTypes : never;
+type DefinitionsFromApi<T> = T extends Api<any, infer Definitions, any, any> ? Definitions : never;
+type TransformedResponse<NewDefinitions extends EndpointDefinitions, K, ResultType> = K extends keyof NewDefinitions ? NewDefinitions[K]['transformResponse'] extends undefined ? ResultType : UnwrapPromise<ReturnType<NonUndefined<NewDefinitions[K]['transformResponse']>>> : ResultType;
+type OverrideResultType<Definition, NewResultType> = Definition extends QueryDefinition<infer QueryArg, infer BaseQuery, infer TagTypes, any, infer ReducerPath> ? QueryDefinition<QueryArg, BaseQuery, TagTypes, NewResultType, ReducerPath> : Definition extends MutationDefinition<infer QueryArg, infer BaseQuery, infer TagTypes, any, infer ReducerPath> ? MutationDefinition<QueryArg, BaseQuery, TagTypes, NewResultType, ReducerPath> : Definition extends InfiniteQueryDefinition<infer QueryArg, infer PageParam, infer BaseQuery, infer TagTypes, any, infer ReducerPath> ? InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery, TagTypes, NewResultType, ReducerPath> : never;
+type UpdateDefinitions<Definitions extends EndpointDefinitions, NewTagTypes extends string, NewDefinitions extends EndpointDefinitions> = {
+    [K in keyof Definitions]: Definitions[K] extends QueryDefinition<infer QueryArg, infer BaseQuery, any, infer ResultType, infer ReducerPath> ? QueryDefinition<QueryArg, BaseQuery, NewTagTypes, TransformedResponse<NewDefinitions, K, ResultType>, ReducerPath> : Definitions[K] extends MutationDefinition<infer QueryArg, infer BaseQuery, any, infer ResultType, infer ReducerPath> ? MutationDefinition<QueryArg, BaseQuery, NewTagTypes, TransformedResponse<NewDefinitions, K, ResultType>, ReducerPath> : Definitions[K] extends InfiniteQueryDefinition<infer QueryArg, infer PageParam, infer BaseQuery, any, infer ResultType, infer ReducerPath> ? InfiniteQueryDefinition<QueryArg, PageParam, BaseQuery, NewTagTypes, TransformedResponse<NewDefinitions, K, ResultType>, ReducerPath> : never;
+};
+
+type QueryCacheKey = string & {
+    _type: 'queryCacheKey';
+};
+type QuerySubstateIdentifier = {
+    queryCacheKey: QueryCacheKey;
+};
+type MutationSubstateIdentifier = {
+    requestId: string;
+    fixedCacheKey?: string;
+} | {
+    requestId?: string;
+    fixedCacheKey: string;
+};
+type RefetchConfigOptions = {
+    refetchOnMountOrArgChange: boolean | number;
+    refetchOnReconnect: boolean;
+    refetchOnFocus: boolean;
+};
+type InfiniteQueryConfigOptions<DataType, PageParam, QueryArg> = {
+    /**
+     * The initial page parameter to use for the first page fetch.
+     */
+    initialPageParam: PageParam;
+    /**
+     * This function is required to automatically get the next cursor for infinite queries.
+     * The result will also be used to determine the value of `hasNextPage`.
+     */
+    getNextPageParam: (lastPage: DataType, allPages: Array<DataType>, lastPageParam: PageParam, allPageParams: Array<PageParam>, queryArg: QueryArg) => PageParam | undefined | null;
+    /**
+     * This function can be set to automatically get the previous cursor for infinite queries.
+     * The result will also be used to determine the value of `hasPreviousPage`.
+     */
+    getPreviousPageParam?: (firstPage: DataType, allPages: Array<DataType>, firstPageParam: PageParam, allPageParams: Array<PageParam>, queryArg: QueryArg) => PageParam | undefined | null;
+    /**
+     * If specified, only keep this many pages in cache at once.
+     * If additional pages are fetched, older pages in the other
+     * direction will be dropped from the cache.
+     */
+    maxPages?: number;
+};
+type InfiniteData<DataType, PageParam> = {
+    pages: Array<DataType>;
+    pageParams: Array<PageParam>;
+};
+/**
+ * Strings describing the query state at any given time.
+ */
+declare enum QueryStatus {
+    uninitialized = "uninitialized",
+    pending = "pending",
+    fulfilled = "fulfilled",
+    rejected = "rejected"
+}
+type RequestStatusFlags = {
+    status: QueryStatus.uninitialized;
+    isUninitialized: true;
+    isLoading: false;
+    isSuccess: false;
+    isError: false;
+} | {
+    status: QueryStatus.pending;
+    isUninitialized: false;
+    isLoading: true;
+    isSuccess: false;
+    isError: false;
+} | {
+    status: QueryStatus.fulfilled;
+    isUninitialized: false;
+    isLoading: false;
+    isSuccess: true;
+    isError: false;
+} | {
+    status: QueryStatus.rejected;
+    isUninitialized: false;
+    isLoading: false;
+    isSuccess: false;
+    isError: true;
+};
+/**
+ * @public
+ */
+type SubscriptionOptions = {
+    /**
+     * How frequently to automatically re-fetch data (in milliseconds). Defaults to `0` (off).
+     */
+    pollingInterval?: number;
+    /**
+     *  Defaults to 'false'. This setting allows you to control whether RTK Query will continue polling if the window is not focused.
+     *
+     *  If pollingInterval is not set or set to 0, this **will not be evaluated** until pollingInterval is greater than 0.
+     *
+     *  Note: requires [`setupListeners`](./setupListeners) to have been called.
+     */
+    skipPollingIfUnfocused?: boolean;
+    /**
+     * Defaults to `false`. This setting allows you to control whether RTK Query will try to refetch all subscribed queries after regaining a network connection.
+     *
+     * If you specify this option alongside `skip: true`, this **will not be evaluated** until `skip` is false.
+     *
+     * Note: requires [`setupListeners`](./setupListeners) to have been called.
+     */
+    refetchOnReconnect?: boolean;
+    /**
+     * Defaults to `false`. This setting allows you to control whether RTK Query will try to refetch all subscribed queries after the application window regains focus.
+     *
+     * If you specify this option alongside `skip: true`, this **will not be evaluated** until `skip` is false.
+     *
+     * Note: requires [`setupListeners`](./setupListeners) to have been called.
+     */
+    refetchOnFocus?: boolean;
+};
+type Subscribers = {
+    [requestId: string]: SubscriptionOptions;
+};
+type QueryKeys<Definitions extends EndpointDefinitions> = {
+    [K in keyof Definitions]: Definitions[K] extends QueryDefinition<any, any, any, any> ? K : never;
+}[keyof Definitions];
+type InfiniteQueryKeys<Definitions extends EndpointDefinitions> = {
+    [K in keyof Definitions]: Definitions[K] extends InfiniteQueryDefinition<any, any, any, any, any> ? K : never;
+}[keyof Definitions];
+type MutationKeys<Definitions extends EndpointDefinitions> = {
+    [K in keyof Definitions]: Definitions[K] extends MutationDefinition<any, any, any, any> ? K : never;
+}[keyof Definitions];
+type BaseQuerySubState<D extends BaseEndpointDefinition<any, any, any, any>, DataType = ResultTypeFrom<D>> = {
+    /**
+     * The argument originally passed into the hook or `initiate` action call
+     */
+    originalArgs: QueryArgFromAnyQuery<D>;
+    /**
+     * A unique ID associated with the request
+     */
+    requestId: string;
+    /**
+     * The received data from the query
+     */
+    data?: DataType;
+    /**
+     * The received error if applicable
+     */
+    error?: SerializedError | (D extends QueryDefinition<any, infer BaseQuery, any, any> ? BaseQueryError<BaseQuery> : never);
+    /**
+     * The name of the endpoint associated with the query
+     */
+    endpointName: string;
+    /**
+     * Time that the latest query started
+     */
+    startedTimeStamp: number;
+    /**
+     * Time that the latest query was fulfilled
+     */
+    fulfilledTimeStamp?: number;
+};
+type QuerySubState<D extends BaseEndpointDefinition<any, any, any, any>, DataType = ResultTypeFrom<D>> = Id<({
+    status: QueryStatus.fulfilled;
+} & WithRequiredProp<BaseQuerySubState<D, DataType>, 'data' | 'fulfilledTimeStamp'> & {
+    error: undefined;
+}) | ({
+    status: QueryStatus.pending;
+} & BaseQuerySubState<D, DataType>) | ({
+    status: QueryStatus.rejected;
+} & WithRequiredProp<BaseQuerySubState<D, DataType>, 'error'>) | {
+    status: QueryStatus.uninitialized;
+    originalArgs?: undefined;
+    data?: undefined;
+    error?: undefined;
+    requestId?: undefined;
+    endpointName?: string;
+    startedTimeStamp?: undefined;
+    fulfilledTimeStamp?: undefined;
+}>;
+type InfiniteQueryDirection = 'forward' | 'backward';
+type InfiniteQuerySubState<D extends BaseEndpointDefinition<any, any, any, any>> = D extends InfiniteQueryDefinition<any, any, any, any, any> ? QuerySubState<D, InfiniteData<ResultTypeFrom<D>, PageParamFrom<D>>> & {
+    direction?: InfiniteQueryDirection;
+} : never;
+type BaseMutationSubState<D extends BaseEndpointDefinition<any, any, any, any>> = {
+    requestId: string;
+    data?: ResultTypeFrom<D>;
+    error?: SerializedError | (D extends MutationDefinition<any, infer BaseQuery, any, any> ? BaseQueryError<BaseQuery> : never);
+    endpointName: string;
+    startedTimeStamp: number;
+    fulfilledTimeStamp?: number;
+};
+type MutationSubState<D extends BaseEndpointDefinition<any, any, any, any>> = (({
+    status: QueryStatus.fulfilled;
+} & WithRequiredProp<BaseMutationSubState<D>, 'data' | 'fulfilledTimeStamp'>) & {
+    error: undefined;
+}) | (({
+    status: QueryStatus.pending;
+} & BaseMutationSubState<D>) & {
+    data?: undefined;
+}) | ({
+    status: QueryStatus.rejected;
+} & WithRequiredProp<BaseMutationSubState<D>, 'error'>) | {
+    requestId?: undefined;
+    status: QueryStatus.uninitialized;
+    data?: undefined;
+    error?: undefined;
+    endpointName?: string;
+    startedTimeStamp?: undefined;
+    fulfilledTimeStamp?: undefined;
+};
+type CombinedState<D extends EndpointDefinitions, E extends string, ReducerPath extends string> = {
+    queries: QueryState<D>;
+    mutations: MutationState<D>;
+    provided: InvalidationState<E>;
+    subscriptions: SubscriptionState;
+    config: ConfigState<ReducerPath>;
+};
+type InvalidationState<TagTypes extends string> = {
+    tags: {
+        [_ in TagTypes]: {
+            [id: string]: Array<QueryCacheKey>;
+            [id: number]: Array<QueryCacheKey>;
+        };
+    };
+    keys: Record<QueryCacheKey, Array<FullTagDescription<any>>>;
+};
+type QueryState<D extends EndpointDefinitions> = {
+    [queryCacheKey: string]: QuerySubState<D[string]> | InfiniteQuerySubState<D[string]> | undefined;
+};
+type SubscriptionState = {
+    [queryCacheKey: string]: Subscribers | undefined;
+};
+type ConfigState<ReducerPath> = RefetchConfigOptions & {
+    reducerPath: ReducerPath;
+    online: boolean;
+    focused: boolean;
+    middlewareRegistered: boolean | 'conflict';
+} & ModifiableConfigState;
+type ModifiableConfigState = {
+    keepUnusedDataFor: number;
+    invalidationBehavior: 'delayed' | 'immediately';
+} & RefetchConfigOptions;
+type MutationState<D extends EndpointDefinitions> = {
+    [requestId: string]: MutationSubState<D[string]> | undefined;
+};
+type RootState<Definitions extends EndpointDefinitions, TagTypes extends string, ReducerPath extends string> = {
+    [P in ReducerPath]: CombinedState<Definitions, TagTypes, P>;
+};
+
+type ResponseHandler = 'content-type' | 'json' | 'text' | ((response: Response) => Promise<any>);
+type CustomRequestInit = Override<RequestInit, {
+    headers?: Headers | string[][] | Record<string, string | undefined> | undefined;
+}>;
+interface FetchArgs extends CustomRequestInit {
+    url: string;
+    params?: Record<string, any>;
+    body?: any;
+    responseHandler?: ResponseHandler;
+    validateStatus?: (response: Response, body: any) => boolean;
+    /**
+     * A number in milliseconds that represents that maximum time a request can take before timing out.
+     */
+    timeout?: number;
+}
+type FetchBaseQueryError = {
+    /**
+     * * `number`:
+     *   HTTP status code
+     */
+    status: number;
+    data: unknown;
+} | {
+    /**
+     * * `"FETCH_ERROR"`:
+     *   An error that occurred during execution of `fetch` or the `fetchFn` callback option
+     **/
+    status: 'FETCH_ERROR';
+    data?: undefined;
+    error: string;
+} | {
+    /**
+     * * `"PARSING_ERROR"`:
+     *   An error happened during parsing.
+     *   Most likely a non-JSON-response was returned with the default `responseHandler` "JSON",
+     *   or an error occurred while executing a custom `responseHandler`.
+     **/
+    status: 'PARSING_ERROR';
+    originalStatus: number;
+    data: string;
+    error: string;
+} | {
+    /**
+     * * `"TIMEOUT_ERROR"`:
+     *   Request timed out
+     **/
+    status: 'TIMEOUT_ERROR';
+    data?: undefined;
+    error: string;
+} | {
+    /**
+     * * `"CUSTOM_ERROR"`:
+     *   A custom error type that you can return from your `queryFn` where another error might not make sense.
+     **/
+    status: 'CUSTOM_ERROR';
+    data?: unknown;
+    error: string;
+};
+type FetchBaseQueryArgs = {
+    baseUrl?: string;
+    prepareHeaders?: (headers: Headers, api: Pick<BaseQueryApi, 'getState' | 'extra' | 'endpoint' | 'type' | 'forced'> & {
+        arg: string | FetchArgs;
+        extraOptions: unknown;
+    }) => MaybePromise<Headers | void>;
+    fetchFn?: (input: RequestInfo, init?: RequestInit | undefined) => Promise<Response>;
+    paramsSerializer?: (params: Record<string, any>) => string;
+    /**
+     * By default, we only check for 'application/json' and 'application/vnd.api+json' as the content-types for json. If you need to support another format, you can pass
+     * in a predicate function for your given api to get the same automatic stringifying behavior
+     * @example
+     * ```ts
+     * const isJsonContentType = (headers: Headers) => ["application/vnd.api+json", "application/json", "application/vnd.hal+json"].includes(headers.get("content-type")?.trim());
+     * ```
+     */
+    isJsonContentType?: (headers: Headers) => boolean;
+    /**
+     * Defaults to `application/json`;
+     */
+    jsonContentType?: string;
+    /**
+     * Custom replacer function used when calling `JSON.stringify()`;
+     */
+    jsonReplacer?: (this: any, key: string, value: any) => any;
+} & RequestInit & Pick<FetchArgs, 'responseHandler' | 'validateStatus' | 'timeout'>;
+type FetchBaseQueryMeta = {
+    request: Request;
+    response?: Response;
+};
+/**
+ * This is a very small wrapper around fetch that aims to simplify requests.
+ *
+ * @example
+ * ```ts
+ * const baseQuery = fetchBaseQuery({
+ *   baseUrl: 'https://api.your-really-great-app.com/v1/',
+ *   prepareHeaders: (headers, { getState }) => {
+ *     const token = (getState() as RootState).auth.token;
+ *     // If we have a token set in state, let's assume that we should be passing it.
+ *     if (token) {
+ *       headers.set('authorization', `Bearer ${token}`);
+ *     }
+ *     return headers;
+ *   },
+ * })
+ * ```
+ *
+ * @param {string} baseUrl
+ * The base URL for an API service.
+ * Typically in the format of https://example.com/
+ *
+ * @param {(headers: Headers, api: { getState: () => unknown; arg: string | FetchArgs; extra: unknown; endpoint: string; type: 'query' | 'mutation'; forced: boolean; }) => Headers} prepareHeaders
+ * An optional function that can be used to inject headers on requests.
+ * Provides a Headers object, most of the `BaseQueryApi` (`dispatch` is not available), and the arg passed into the query function.
+ * Useful for setting authentication or headers that need to be set conditionally.
+ *
+ * @link https://developer.mozilla.org/en-US/docs/Web/API/Headers
+ *
+ * @param {(input: RequestInfo, init?: RequestInit | undefined) => Promise<Response>} fetchFn
+ * Accepts a custom `fetch` function if you do not want to use the default on the window.
+ * Useful in SSR environments if you need to use a library such as `isomorphic-fetch` or `cross-fetch`
+ *
+ * @param {(params: Record<string, unknown>) => string} paramsSerializer
+ * An optional function that can be used to stringify querystring parameters.
+ *
+ * @param {(headers: Headers) => boolean} isJsonContentType
+ * An optional predicate function to determine if `JSON.stringify()` should be called on the `body` arg of `FetchArgs`
+ *
+ * @param {string} jsonContentType Used when automatically setting the content-type header for a request with a jsonifiable body that does not have an explicit content-type header. Defaults to `application/json`.
+ *
+ * @param {(this: any, key: string, value: any) => any} jsonReplacer Custom replacer function used when calling `JSON.stringify()`.
+ *
+ * @param {number} timeout
+ * A number in milliseconds that represents the maximum time a request can take before timing out.
+ */
+declare function fetchBaseQuery({ baseUrl, prepareHeaders, fetchFn, paramsSerializer, isJsonContentType, jsonContentType, jsonReplacer, timeout: defaultTimeout, responseHandler: globalResponseHandler, validateStatus: globalValidateStatus, ...baseFetchOptions }?: FetchBaseQueryArgs): BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError, {}, FetchBaseQueryMeta>;
+
+type RetryConditionFunction = (error: BaseQueryError<BaseQueryFn>, args: BaseQueryArg<BaseQueryFn>, extraArgs: {
+    attempt: number;
+    baseQueryApi: BaseQueryApi;
+    extraOptions: BaseQueryExtraOptions<BaseQueryFn> & RetryOptions;
+}) => boolean;
+type RetryOptions = {
+    /**
+     * Function used to determine delay between retries
+     */
+    backoff?: (attempt: number, maxRetries: number) => Promise<void>;
+} & ({
+    /**
+     * How many times the query will be retried (default: 5)
+     */
+    maxRetries?: number;
+    retryCondition?: undefined;
+} | {
+    /**
+     * Callback to determine if a retry should be attempted.
+     * Return `true` for another retry and `false` to quit trying prematurely.
+     */
+    retryCondition?: RetryConditionFunction;
+    maxRetries?: undefined;
+});
+declare function fail<BaseQuery extends BaseQueryFn = BaseQueryFn>(error: BaseQueryError<BaseQuery>, meta?: BaseQueryMeta<BaseQuery>): never;
+/**
+ * A utility that can wrap `baseQuery` in the API definition to provide retries with a basic exponential backoff.
+ *
+ * @example
+ *
+ * ```ts
+ * // codeblock-meta title="Retry every request 5 times by default"
+ * import { createApi, fetchBaseQuery, retry } from '@reduxjs/toolkit/query/react'
+ * interface Post {
+ *   id: number
+ *   name: string
+ * }
+ * type PostsResponse = Post[]
+ *
+ * // maxRetries: 5 is the default, and can be omitted. Shown for documentation purposes.
+ * const staggeredBaseQuery = retry(fetchBaseQuery({ baseUrl: '/' }), { maxRetries: 5 });
+ * export const api = createApi({
+ *   baseQuery: staggeredBaseQuery,
+ *   endpoints: (build) => ({
+ *     getPosts: build.query<PostsResponse, void>({
+ *       query: () => ({ url: 'posts' }),
+ *     }),
+ *     getPost: build.query<PostsResponse, string>({
+ *       query: (id) => ({ url: `post/${id}` }),
+ *       extraOptions: { maxRetries: 8 }, // You can override the retry behavior on each endpoint
+ *     }),
+ *   }),
+ * });
+ *
+ * export const { useGetPostsQuery, useGetPostQuery } = api;
+ * ```
+ */
+declare const retry: BaseQueryEnhancer<unknown, RetryOptions, void | RetryOptions> & {
+    fail: typeof fail;
+};
+
+declare function copyWithStructuralSharing<T>(oldObj: any, newObj: T): T;
+
+export { type Api, type ApiContext, type ApiEndpointInfiniteQuery, type ApiEndpointMutation, type ApiEndpointQuery, type ApiModules, type BaseEndpointDefinition, type BaseQueryApi, type BaseQueryArg, type BaseQueryEnhancer, type BaseQueryError, type BaseQueryExtraOptions, type BaseQueryFn, type BaseQueryMeta, type BaseQueryResult, type CombinedState, type CoreModule, type CreateApi, type CreateApiOptions, DefinitionType, type DefinitionsFromApi, type EndpointBuilder, type EndpointDefinition, type EndpointDefinitions, type FetchArgs, type FetchBaseQueryArgs, type FetchBaseQueryError, type FetchBaseQueryMeta, type InfiniteData, type InfiniteQueryActionCreatorResult, type InfiniteQueryArgFrom, type InfiniteQueryConfigOptions, type InfiniteQueryDefinition, type InfiniteQueryExtraOptions, type InfiniteQueryResultSelectorResult, type InfiniteQuerySubState, type Module, type MutationActionCreatorResult, type MutationDefinition, type MutationExtraOptions, type MutationResultSelectorResult, NamedSchemaError, type OverrideResultType, type PageParamFrom, type PrefetchOptions, type QueryActionCreatorResult, type QueryArgFrom, type QueryCacheKey, type QueryDefinition, type QueryExtraOptions, type QueryKeys, type QueryResultSelectorResult, type QueryReturnValue, QueryStatus, type QuerySubState, type ResultDescription, type ResultTypeFrom, type RetryOptions, type RootState, type SchemaFailureConverter, type SchemaFailureHandler, type SchemaFailureInfo, type SchemaType, type SerializeQueryArgs, type SkipToken, type StartQueryActionCreatorOptions, type SubscriptionOptions, type Id as TSHelpersId, type NoInfer as TSHelpersNoInfer, type Override as TSHelpersOverride, type TagDescription, type TagTypesFromApi, type TypedMutationOnQueryStarted, type TypedQueryOnQueryStarted, type UpdateDefinitions, buildCreateApi, copyWithStructuralSharing, coreModule, createApi, defaultSerializeQueryArgs, fakeBaseQuery, fetchBaseQuery, retry, setupListeners };
