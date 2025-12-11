@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { analyzeMedicalReport } from '../../services/geminiService';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { EReportResponse, ReportParameter } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -31,6 +32,7 @@ const ParameterItem: React.FC<{ item: ReportParameter }> = ({ item }) => {
 };
 
 const EReports: React.FC = () => {
+    const { t, getLanguageName } = useLanguage();
     const [file, setFile] = useState<File | null>(null);
     const [fileName, setFileName] = useState<string>('');
     const [loading, setLoading] = useState(false);
@@ -71,7 +73,7 @@ const EReports: React.FC = () => {
 
         try {
             const base64String = await fileToBase64(file);
-            const analysis = await analyzeMedicalReport(base64String, file.type);
+            const analysis = await analyzeMedicalReport(base64String, file.type, getLanguageName());
             
             if (analysis) {
                 setResult(analysis);
@@ -91,7 +93,7 @@ const EReports: React.FC = () => {
             <Card>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload Medical Report (Image)</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('reports.uploadLabel')}</label>
                         <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md">
                             <div className="space-y-1 text-center">
                                 <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
@@ -107,7 +109,7 @@ const EReports: React.FC = () => {
                                 <p className="text-xs text-gray-500 dark:text-gray-500">PNG, JPG, WEBP up to 4MB</p>
                             </div>
                         </div>
-                         {fileName && <p className="text-center mt-2 text-sm text-gray-500">Selected: {fileName}</p>}
+                         {fileName && <p className="text-center mt-2 text-sm text-gray-500">{t('reports.selected')} {fileName}</p>}
                     </div>
                     <div>
                         <Button type="submit" isLoading={loading} disabled={loading || !file} className="w-full">Analyze Report</Button>

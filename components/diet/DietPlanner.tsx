@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { getDietPlan } from '../../services/geminiService';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { DietPlanResponse, DailyPlan } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -39,6 +40,7 @@ const MealCard: React.FC<{ meal: DailyPlan }> = ({ meal }) => {
 
 
 const DietPlanner: React.FC = () => {
+  const { t, getLanguageName } = useLanguage();
   const [formData, setFormData] = useState({
     goal: 'Weight Loss',
     preferences: '',
@@ -66,7 +68,7 @@ const DietPlanner: React.FC = () => {
       return;
     }
     
-    const plan = await getDietPlan(goal, preferences, allergies, calories);
+    const plan = await getDietPlan(goal, preferences, allergies, calories, getLanguageName());
     if (plan) {
       setResult(plan);
     } else {

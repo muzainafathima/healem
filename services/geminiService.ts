@@ -40,15 +40,17 @@ const generateContentWithRetry = async <T,>(prompt: string, responseSchema: any)
   }
 };
 
-export const getDiseasePrediction = async (symptoms: string, age: number, gender: string, duration: string): Promise<DiseasePredictionResponse | null> => {
+export const getDiseasePrediction = async (symptoms: string, age: number, gender: string, duration: string, language: string = 'English'): Promise<DiseasePredictionResponse | null> => {
   const prompt = `
+    IMPORTANT: Respond in ${language} language.
+    
     Analyze the following health information and predict potential diseases.
     - Age: ${age}
     - Gender: ${gender}
     - Symptoms: ${symptoms}
     - Duration of symptoms: ${duration}
 
-    Provide a JSON response with a disclaimer, top 3 predictions (including disease, description, reasoning, and a confidence score from 0 to 1), and actionable next steps.
+    Provide a JSON response in ${language} with a disclaimer, top 3 predictions (including disease, description, reasoning, and a confidence score from 0 to 1), and actionable next steps.
   `;
   
   const schema = {
@@ -80,8 +82,9 @@ export const getDiseasePrediction = async (symptoms: string, age: number, gender
 };
 
 
-export const getRiskAnalysis = async (healthData: Record<string, string>): Promise<RiskAnalysisResponse | null> => {
+export const getRiskAnalysis = async (healthData: Record<string, string>, language: string = 'English'): Promise<RiskAnalysisResponse | null> => {
     console.log('🏥 Starting risk analysis with data:', healthData);
+    console.log('🌐 Response language:', language);
     
     let genderSpecificPrompts = '';
     if (healthData.gender === 'Female') {
@@ -100,6 +103,8 @@ export const getRiskAnalysis = async (healthData: Record<string, string>): Promi
     }
     
     const prompt = `
+      IMPORTANT: Respond entirely in ${language} language.
+      
       Analyze the following comprehensive health data for a user and provide a detailed health risk analysis.
       The data includes personal details, lifestyle habits, and known health indicators.
       
@@ -118,7 +123,7 @@ export const getRiskAnalysis = async (healthData: Record<string, string>): Promi
       
       ${genderSpecificPrompts}
       
-      Based on ALL this data, provide a JSON response with a disclaimer, a risk scoreboard for Heart Disease, Type 2 Diabetes, and General Cancers. If gender-specific data is provided, incorporate risks like Breast Cancer, Ovarian Cancer, or PCOS for females, and Prostate Cancer for males into your analysis and scoreboard where relevant. Each item in the scoreboard should have a 'risk_category', a 'score' from 0 (very low risk) to 100 (very high risk), and a brief 'explanation' for the score. Also, provide 3-5 personalized, actionable 'recommendations' for risk reduction based on the user's specific inputs.
+      Based on ALL this data, provide a JSON response in ${language} with a disclaimer, a risk scoreboard for Heart Disease, Type 2 Diabetes, and General Cancers. If gender-specific data is provided, incorporate risks like Breast Cancer, Ovarian Cancer, or PCOS for females, and Prostate Cancer for males into your analysis and scoreboard where relevant. Each item in the scoreboard should have a 'risk_category', a 'score' from 0 (very low risk) to 100 (very high risk), and a brief 'explanation' for the score. Also, provide 3-5 personalized, actionable 'recommendations' for risk reduction based on the user's specific inputs.
     `;
     
     const schema = {
@@ -148,7 +153,7 @@ export const getRiskAnalysis = async (healthData: Record<string, string>): Promi
     return generateContentWithRetry<RiskAnalysisResponse>(prompt, schema);
 };
 
-export const analyzeMedicalReport = async (reportImageBase64: string, mimeType: string): Promise<EReportResponse | null> => {
+export const analyzeMedicalReport = async (reportImageBase64: string, mimeType: string, language: string = 'English'): Promise<EReportResponse | null> => {
     try {
         const imagePart = {
             inlineData: {
@@ -159,7 +164,9 @@ export const analyzeMedicalReport = async (reportImageBase64: string, mimeType: 
 
         const textPart = {
             text: `
-                Analyze this medical report. Provide a JSON response with:
+                IMPORTANT: Respond entirely in ${language} language.
+                
+                Analyze this medical report. Provide a JSON response in ${language} with:
                 1.  A disclaimer that this is not medical advice.
                 2.  An "overall_summary" of the findings in simple terms.
                 3.  A "parameter_breakdown" array. For each key parameter (like Cholesterol, Blood Sugar, RBC, etc.), provide an object with: "parameter" name, its "value" from the report, the "normal_range", a simple "explanation", a relatable "analogy", and a "recommendation".
@@ -207,15 +214,17 @@ export const analyzeMedicalReport = async (reportImageBase64: string, mimeType: 
     }
 };
 
-export const getDietPlan = async (goal: string, preferences: string, allergies: string, calories: string): Promise<DietPlanResponse | null> => {
+export const getDietPlan = async (goal: string, preferences: string, allergies: string, calories: string, language: string = 'English'): Promise<DietPlanResponse | null> => {
     const prompt = `
+        IMPORTANT: Respond entirely in ${language} language.
+        
         Create a personalized 3-day diet plan based on the following user details:
         - Goal: ${goal}
         - Dietary Preferences: ${preferences}
         - Allergies: ${allergies}
         - Target Daily Calories: ${calories}
 
-        Provide a JSON response with a disclaimer, a 3-day plan (each day having breakfast, lunch, dinner, and snacks with name, description, and estimated calories), a "daily_focus" for each day, and general hydration tips.
+        Provide a JSON response in ${language} with a disclaimer, a 3-day plan (each day having breakfast, lunch, dinner, and snacks with name, description, and estimated calories), a "daily_focus" for each day, and general hydration tips.
     `;
 
     const mealSchema = {
@@ -264,11 +273,14 @@ export const getDietPlan = async (goal: string, preferences: string, allergies: 
     return generateContentWithRetry<DietPlanResponse>(prompt, schema);
 };
 
-export const getChatResponse = async (userMessage: string): Promise<string | null> => {
+export const getChatResponse = async (userMessage: string, language: string = 'English'): Promise<string | null> => {
     try {
         console.log('💬 Sending chat message to Gemini...');
+        console.log('🌐 Chat language:', language);
         
         const prompt = `
+            IMPORTANT: Respond entirely in ${language} language.
+            
             You are a helpful health assistant for HealthGuard AI. 
             Provide helpful, empathetic, and accurate health information while being conversational.
             Always remind users that you're an AI assistant and not a replacement for professional medical advice.

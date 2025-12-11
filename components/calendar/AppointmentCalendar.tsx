@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getUserAppointments, cancelAppointment } from '../../services/firebaseService';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { Appointment, AppUser } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 
 const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
+    const { t } = useLanguage();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
                 const userAppointments = await getUserAppointments(user);
                 setAppointments(userAppointments);
             } catch (err) {
-                setError("Failed to fetch appointments. Please try again later.");
+                setError(t('calendar.fetchError'));
                 console.error(err);
             } finally {
                 setLoading(false);
@@ -40,10 +42,10 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
             if (success) {
                 // Remove the appointment from the local state
                 setAppointments(prev => prev.filter(app => app.id !== appointmentId));
-                setSuccessMessage(`Appointment with ${doctorName} has been canceled successfully.`);
+                setSuccessMessage(`${t('calendar.cancelledWith')} ${doctorName} ${t('calendar.hasBeenCancelled')}`);
                 setTimeout(() => setSuccessMessage(null), 5000);
             } else {
-                setError('Failed to cancel appointment. Please try again.');
+                setError(t('calendar.cancelError'));
             }
         } catch (err) {
             setError('An error occurred while canceling the appointment.');
@@ -55,7 +57,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
     };
 
     if (loading) {
-        return <Spinner message="Loading your appointments..." />;
+        return <Spinner message={t('calendar.loading')} />;
     }
 
     if (error) {
@@ -66,12 +68,12 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
         <div className="max-w-4xl mx-auto">
             {successMessage && (
                 <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 border border-green-400 text-green-700" role="alert">
-                    <strong className="font-bold">Success! </strong>
+                    <strong className="font-bold">{t('calendar.success')} </strong>
                     <span className="block sm:inline">{successMessage}</span>
                 </div>
             )}
             <Card>
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Your Appointments</h2>
+                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">{t('calendar.yourAppointments')}</h2>
                 {appointments.length > 0 ? (
                     <div className="space-y-4">
                         {appointments.map(app => {
@@ -102,7 +104,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
                                                             disabled={cancelingId === app.id}
                                                             className="text-sm"
                                                         >
-                                                            Confirm
+                                                            {t('calendar.confirm')}
                                                         </Button>
                                                         <Button
                                                             onClick={() => setConfirmCancel(null)}
@@ -110,7 +112,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
                                                             disabled={cancelingId === app.id}
                                                             className="text-sm"
                                                         >
-                                                            Cancel
+                                                            {t('common.cancel')}
                                                         </Button>
                                                     </div>
                                                 ) : (
@@ -119,7 +121,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
                                                         variant="danger"
                                                         className="text-sm w-full sm:w-auto"
                                                     >
-                                                        Cancel Appointment
+                                                        {t('calendar.cancel')}
                                                     </Button>
                                                 )}
                                             </div>
@@ -130,7 +132,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
                         })}
                     </div>
                 ) : (
-                    <p className="text-center text-gray-500 dark:text-gray-400">You have no upcoming appointments.</p>
+                    <p className="text-center text-gray-500 dark:text-gray-400">{t('calendar.noAppointments')}</p>
                 )}
             </Card>
         </div>

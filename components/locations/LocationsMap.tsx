@@ -6,6 +6,7 @@ import Spinner from '../ui/Spinner';
 import type { HealthcareFacility } from '../../types';
 import { geocodeAddress, findNearbyFacilities } from '../../services/locationService';
 import { SearchIcon, LocationMarkerIcon } from '../layout/Icons';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Haversine formula
 const haversineDistance = (lat1: number | undefined, lon1: number | undefined, lat2: number, lon2: number) => {
@@ -28,6 +29,7 @@ L.Icon.Default.mergeOptions({
 
 
 const LocationsMap: React.FC = () => {
+    const { t } = useLanguage();
     const mapRef = useRef<L.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const userMarkerRef = useRef<L.Marker | null>(null);
@@ -145,7 +147,7 @@ const LocationsMap: React.FC = () => {
                 <Card className='h-full flex flex-col'>
                     <h2 className="text-xl font-bold mb-4">Nearby Facilities</h2>
                     <div className="mb-4">
-                         <label htmlFor="map-search-location" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Search Location</label>
+                         <label htmlFor="map-search-location" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('locations.searchLabel')}</label>
                         <div className="mt-1 flex gap-2">
                             <input type="text" id="map-search-location" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="e.g., New York, NY" className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                             <Button onClick={handleLocationSearch} isLoading={isLocating} className="!px-3"><SearchIcon /></Button>
@@ -172,7 +174,7 @@ const LocationsMap: React.FC = () => {
                                 <Spinner message={`Searching for ${facilityType}s...`} />
                              </div>
                          ) : !location ? (
-                            <p className="text-center text-gray-500 dark:text-gray-400 mt-4">Enter a location to see nearby facilities.</p>
+                            <p className="text-center text-gray-500 dark:text-gray-400 mt-4">{t('locations.enterLocation')}</p>
                          ) : facilitiesWithDistance.length > 0 ? facilitiesWithDistance.map(facility => (
                             <button key={facility.id} onClick={() => flyToLocation(facility.lat, facility.lng)} className="w-full text-left p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                                 <div className="flex justify-between items-center">
@@ -182,7 +184,7 @@ const LocationsMap: React.FC = () => {
                                 <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{facility.type}</p>
                             </button>
                         )) : (
-                            <p className="text-center text-gray-500 dark:text-gray-400 mt-4">No {facilityType}s found near this location.</p>
+                            <p className="text-center text-gray-500 dark:text-gray-400 mt-4">{t('locations.noResults')} {facilityType}s {t('locations.noResultsEnd')}</p>
                         )}
                     </div>
                 </Card>

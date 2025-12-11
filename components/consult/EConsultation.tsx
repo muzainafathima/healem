@@ -7,6 +7,7 @@ import { SPECIALTIES, TIME_SLOTS } from '../../constants';
 import { geocodeAddress, findNearbyDoctors } from '../../services/locationService';
 import { bookAppointment } from '../../services/firebaseService';
 import { SearchIcon, LocationMarkerIcon, PhoneIcon, WebsiteIcon } from '../layout/Icons';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Haversine formula to calculate distance
 const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -25,6 +26,7 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const today = new Date().toISOString().split('T')[0];
 
 const BookingModal: React.FC<{ doctor: Doctor; onClose: () => void; onBook: (doctor: Doctor, date: string, slot: string) => void }> = ({ doctor, onClose, onBook }) => {
+    const { t } = useLanguage();
     const [selectedDate, setSelectedDate] = useState<string>(today);
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
@@ -36,11 +38,11 @@ const BookingModal: React.FC<{ doctor: Doctor; onClose: () => void; onBook: (doc
                 <p className="text-md text-gray-600 dark:text-gray-400 mb-6">{doctor.specialty}</p>
 
                 <div className="mb-4">
-                    <label htmlFor="appointmentDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select a Date</label>
+                    <label htmlFor="appointmentDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('consult.selectDate')}</label>
                     <input type="date" id="appointmentDate" value={selectedDate} min={today} onChange={(e) => setSelectedDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                 </div>
 
-                <h3 className="text-lg font-semibold mb-2">Select a Time Slot</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('consult.selectTime')}</h3>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {TIME_SLOTS.map(slot => (
                         <button key={slot}
@@ -68,6 +70,7 @@ interface EConsultationProps {
 }
 
 const EConsultation: React.FC<EConsultationProps> = ({ user, specialty: initialSpecialty }) => {
+    const { t } = useLanguage();
     const [specialty, setSpecialty] = useState(initialSpecialty || '');
     const [radius, setRadius] = useState(10);
     const [bookingDoctor, setBookingDoctor] = useState<Doctor | null>(null);
@@ -168,7 +171,7 @@ const EConsultation: React.FC<EConsultationProps> = ({ user, specialty: initialS
         if (!location) {
              return (
                 <Card>
-                    <p className="text-center text-gray-500 dark:text-gray-400">Please enter a location to find nearby doctors.</p>
+                    <p className="text-center text-gray-500 dark:text-gray-400">{t('consult.enterLocation')}</p>
                 </Card>
             );
         }
@@ -209,7 +212,7 @@ const EConsultation: React.FC<EConsultationProps> = ({ user, specialty: initialS
         }
         return (
             <Card>
-                <p className="text-center text-gray-500 dark:text-gray-400">No doctors found matching your criteria. Try expanding the search radius or changing the specialty.</p>
+                <p className="text-center text-gray-500 dark:text-gray-400">{t('consult.noResults')}</p>
             </Card>
         );
     };
@@ -225,7 +228,7 @@ const EConsultation: React.FC<EConsultationProps> = ({ user, specialty: initialS
       <Card className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div>
-                 <label htmlFor="search-location" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Your Location</label>
+                 <label htmlFor="search-location" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('consult.yourLocation')}</label>
                 <div className="mt-1 flex gap-2">
                     <input type="text" id="search-location" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="e.g., New York, NY" className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                     <Button onClick={handleLocationSearch} isLoading={isLocating} className="!px-3"><SearchIcon /></Button>
@@ -241,7 +244,7 @@ const EConsultation: React.FC<EConsultationProps> = ({ user, specialty: initialS
                 </select>
             </div>
             <div>
-                <label htmlFor="radius" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Search Radius ({radius} km)</label>
+                <label htmlFor="radius" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('consult.searchRadius')} ({radius} {t('consult.km')})</label>
                 <input type="range" id="radius" min="1" max="50" value={radius} onChange={e => setRadius(Number(e.target.value))} className="mt-1 block w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700" />
             </div>
         </div>

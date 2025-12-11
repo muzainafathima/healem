@@ -14,13 +14,15 @@ import Intro from './components/intro/Intro';
 import Auth from './components/auth/Auth';
 import Spinner from './components/ui/Spinner';
 import Chatbot from './components/chat/Chatbot';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import useDarkMode from './hooks/useDarkMode';
 import { onAuthChange, signOutUser } from './services/firebaseService';
 import type { AppUser, UserProfileData } from './types';
 
 export type Page = 'dashboard' | 'predictor' | 'risk' | 'reports' | 'diet' | 'consult' | 'locations' | 'calendar' | 'profile';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { t } = useLanguage();
   const [isIntro, setIsIntro] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
   const [user, setUser] = useState<AppUser | null>(null);
@@ -109,15 +111,15 @@ const App: React.FC = () => {
   };
   
   const pageTitles: Record<Page, string> = {
-    dashboard: 'Home',
-    predictor: 'Disease Predictor',
-    risk: 'Health Risk Analysis',
-    reports: 'E-Reports Analysis',
-    diet: 'Diet Planner',
-    consult: 'E-Consultation',
-    locations: 'Nearby Health Services',
-    calendar: 'My Appointments',
-    profile: 'My Health Profile'
+    dashboard: t('title.dashboard'),
+    predictor: t('title.disease'),
+    risk: t('title.risk'),
+    reports: t('title.reports'),
+    diet: t('title.diet'),
+    consult: t('title.consult'),
+    locations: t('title.locations'),
+    calendar: t('title.calendar'),
+    profile: t('title.profile')
   };
 
   if (isIntro) {
@@ -125,7 +127,7 @@ const App: React.FC = () => {
   }
   
   if (isInitializing) {
-    return <Spinner message="Connecting..." fullScreen />;
+    return <Spinner message={t('common.loading')} fullScreen />;
   }
 
   if (!user) {
@@ -152,6 +154,14 @@ const App: React.FC = () => {
       {/* Floating Chatbot - appears on all pages */}
       <Chatbot />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 };
 

@@ -3,6 +3,7 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { UserProfileData } from '../../types';
 import { ProfileIcon } from '../layout/Icons';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const initialProfileState: UserProfileData = {
     name: '',
@@ -21,6 +22,7 @@ interface UserProfileProps {
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate }) => {
+    const { t } = useLanguage();
     const [profile, setProfile] = useState<UserProfileData>(initialProfileState);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
@@ -68,7 +70,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Left Column: Photo and Personal Details */}
                     <div className="md:col-span-1 flex flex-col items-center space-y-6">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white md:hidden">My Health Profile</h2>
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white md:hidden">{t('profile.myHealthProfile')}</h2>
                         <div className="relative">
                             <div className="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
                                 {profile.photo ? (
@@ -89,7 +91,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate 
 
                     {/* Right Column: Form Fields */}
                     <div className="md:col-span-2 space-y-6">
-                         <h2 className="text-2xl font-bold text-gray-800 dark:text-white hidden md:block">My Health Profile</h2>
+                         <h2 className="text-2xl font-bold text-gray-800 dark:text-white hidden md:block">{t('profile.myHealthProfile')}</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                              <div>
                                 <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>

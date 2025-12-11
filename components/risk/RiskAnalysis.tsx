@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { getRiskAnalysis } from '../../services/geminiService';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { RiskAnalysisResponse, UserProfileData } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -73,6 +74,7 @@ const GaugeChart = ({ value, name }: { value: number, name: string }) => {
 };
 
 const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
+  const { t, getLanguageName } = useLanguage();
   const [formData, setFormData] = useState({
     age: userProfile?.age || '',
     gender: userProfile?.gender || '',
@@ -129,7 +131,7 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
     setResult(null);
 
     console.log('🚀 Starting risk analysis...');
-    const analysis = await getRiskAnalysis(formData);
+    const analysis = await getRiskAnalysis(formData, getLanguageName());
     if (analysis) {
       console.log('✅ Risk analysis successful');
       setResult(analysis);

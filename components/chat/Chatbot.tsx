@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getChatResponse } from '../../services/geminiService';
+import { useLanguage } from '../../contexts/LanguageContext';
 import Button from '../ui/Button';
 
 interface Message {
@@ -9,11 +10,12 @@ interface Message {
 }
 
 const Chatbot: React.FC = () => {
+    const { t, getLanguageName } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: 'Hello! I\'m your HealthGuard AI assistant. How can I help you with your health concerns today?',
+            content: t('chat.placeholder') || 'Hello! I\'m your HealthGuard AI assistant. How can I help you with your health concerns today?',
             timestamp: new Date()
         }
     ]);
@@ -43,7 +45,7 @@ const Chatbot: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const response = await getChatResponse(inputMessage);
+            const response = await getChatResponse(inputMessage, getLanguageName());
             const assistantMessage: Message = {
                 role: 'assistant',
                 content: response || 'I apologize, but I encountered an error. Please try again.',

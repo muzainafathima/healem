@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { getDiseasePrediction } from '../../services/geminiService';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { DiseasePredictionResponse, UserProfileData } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -84,6 +85,7 @@ const getSpecialtyForDisease = (disease: string): string => {
 };
 
 const DiseasePredictor: React.FC<DiseasePredictorProps> = ({ navigate, userProfile }) => {
+  const { t, getLanguageName } = useLanguage();
   const [formData, setFormData] = useState({
     age: userProfile?.age || '',
     gender: userProfile?.gender || '',
@@ -106,16 +108,16 @@ const DiseasePredictor: React.FC<DiseasePredictorProps> = ({ navigate, userProfi
 
     const { age, gender, symptoms, duration } = formData;
     if (!age || !gender || !symptoms || !duration) {
-      setError('Please fill out all fields.');
+      setError(t('predictor.fillAllFields'));
       setLoading(false);
       return;
     }
 
-    const prediction = await getDiseasePrediction(symptoms, parseInt(age), gender, duration);
+    const prediction = await getDiseasePrediction(symptoms, parseInt(age), gender, duration, getLanguageName());
     if (prediction) {
       setResult(prediction);
     } else {
-      setError('Failed to get a prediction. The AI service may be unavailable. Please try again later.');
+      setError(t('predictor.error') || 'Failed to get a prediction. The AI service may be unavailable. Please try again later.');
     }
     setLoading(false);
   }, [formData]);
@@ -144,25 +146,25 @@ const DiseasePredictor: React.FC<DiseasePredictorProps> = ({ navigate, userProfi
                 </span>
               </div>
               <p className="mt-1 text-gray-700 dark:text-gray-300">{p.description}</p>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400"><span className="font-semibold">Reasoning:</span> {p.reasoning}</p>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400"><span className="font-semibold">{t('predictor.reasoning')}</span> {p.reasoning}</p>
             </div>
           ))}
         </div>
 
         <div className="mt-8">
-            <h3 className="text-xl font-semibold mb-2">Recommended Next Steps</h3>
+            <h3 className="text-xl font-semibold mb-2">{t('predictor.nextSteps')}</h3>
             <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
                 {result.next_steps.map((step, i) => <li key={i}>{step}</li>)}
             </ul>
         </div>
         {topPrediction && (
             <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6 text-center">
-              <h3 className="text-xl font-semibold mb-2">Need a Specialist?</h3>
+              <h3 className="text-xl font-semibold mb-2">{t('predictor.needSpecialist')}</h3>
               <p className="mb-4 text-gray-600 dark:text-gray-400">
-                Based on your results, we suggest consulting a <strong>{suggestedSpecialty}</strong> specialist.
+                {t('predictor.suggestSpecialty')} <strong>{suggestedSpecialty}</strong> {t('predictor.specialist')}
               </p>
               <Button onClick={() => navigate('consult', { specialty: suggestedSpecialty })}>
-                Find a {suggestedSpecialty} Doctor Near You
+                {t('predictor.findDoctor')} {suggestedSpecialty} {t('predictor.doctorNearYou')}
               </Button>
             </div>
         )}
@@ -176,37 +178,37 @@ const DiseasePredictor: React.FC<DiseasePredictorProps> = ({ navigate, userProfi
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
+                    <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.age')}</label>
                     <input type="number" name="age" id="age" value={formData.age} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
-                    <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Gender</label>
+                    <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.gender')}</label>
                     <select name="gender" id="gender" value={formData.gender} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
+                        <option value="">{t('predictor.selectGender')}</option>
+                        <option value="Male">{t('predictor.male')}</option>
+                        <option value="Female">{t('predictor.female')}</option>
+                        <option value="Other">{t('predictor.other')}</option>
                     </select>
                 </div>
             </div>
             <div>
-                <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Describe your symptoms</label>
-                <textarea name="symptoms" id="symptoms" rows={4} value={formData.symptoms} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="e.g., persistent cough, headache, fatigue..."></textarea>
+                <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.symptomsLabel')}</label>
+                <textarea name="symptoms" id="symptoms" rows={4} value={formData.symptoms} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder={t('predictor.symptomsPlaceholder')}></textarea>
             </div>
             <div>
-                <label htmlFor="duration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Duration of symptoms</label>
-                <input type="text" name="duration" id="duration" value={formData.duration} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="e.g., 3 days, 2 weeks..." />
+                <label htmlFor="duration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.duration')}</label>
+                <input type="text" name="duration" id="duration" value={formData.duration} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder={t('predictor.durationPlaceholder')} />
             </div>
             <div>
                 <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
-                    Get Prediction
+                    {t('predictor.analyze')}
                 </Button>
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
         </form>
       </Card>
       
-      {loading && <div className="mt-8"><Spinner message="AI is analyzing your symptoms..." /></div>}
+      {loading && <div className="mt-8"><Spinner message={t('predictor.analyzing')} /></div>}
       {renderResult()}
     </div>
   );

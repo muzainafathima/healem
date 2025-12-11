@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Page } from '../../App';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { DashboardIcon, PredictorIcon, RiskIcon, ReportsIcon, DietIcon, ConsultIcon, LocationsIcon, HealthGuardLogo, CalendarIcon, ProfileIcon } from './Icons';
 
 interface SidebarProps {
@@ -9,19 +10,21 @@ interface SidebarProps {
   setOpen: (isOpen: boolean) => void;
 }
 
-const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-  { id: 'predictor', label: 'Disease Predictor', icon: <PredictorIcon /> },
-  { id: 'risk', label: 'Risk Analysis', icon: <RiskIcon /> },
-  { id: 'reports', label: 'E-Reports', icon: <ReportsIcon /> },
-  { id: 'diet', label: 'Diet Planner', icon: <DietIcon /> },
-  { id: 'consult', label: 'E-Consultation', icon: <ConsultIcon /> },
-  { id: 'locations', label: 'Locations', icon: <LocationsIcon /> },
-  { id: 'calendar', label: 'My Appointments', icon: <CalendarIcon /> },
-  { id: 'profile', label: 'My Health Profile', icon: <ProfileIcon /> },
-];
-
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, setOpen }) => {
+    const { t } = useLanguage();
+    
+    const navItems = [
+      { id: 'dashboard', label: t('nav.dashboard'), icon: <DashboardIcon /> },
+      { id: 'predictor', label: t('nav.disease'), icon: <PredictorIcon /> },
+      { id: 'risk', label: t('nav.risk'), icon: <RiskIcon /> },
+      { id: 'reports', label: t('nav.reports'), icon: <ReportsIcon /> },
+      { id: 'diet', label: t('nav.diet'), icon: <DietIcon /> },
+      { id: 'consult', label: t('nav.consult'), icon: <ConsultIcon /> },
+      { id: 'locations', label: t('nav.locations'), icon: <LocationsIcon /> },
+      { id: 'calendar', label: t('nav.calendar'), icon: <CalendarIcon /> },
+      { id: 'profile', label: t('nav.profile'), icon: <ProfileIcon /> },
+    ];
+    
     const handleNavigation = (page: Page) => {
         setCurrentPage(page);
         if (window.innerWidth < 1024) { // Close sidebar on mobile after navigation
