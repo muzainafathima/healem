@@ -65,10 +65,10 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate, toggleSidebar }) => {
       {/* Hamburger menu button - top left */}
       <button
         onClick={toggleSidebar}
-        className="fixed top-6 left-6 z-50 p-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 text-white"
+        className="fixed top-4 left-4 lg:top-6 lg:left-6 z-50 p-3 lg:p-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 text-white"
         aria-label="Toggle menu"
       >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+        <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>

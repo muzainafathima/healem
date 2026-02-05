@@ -32,6 +32,18 @@ const AppContent: React.FC = () => {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
 
+  // Prevent body scroll when sidebar open on mobile
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isSidebarOpen]);
+
   // Initialize Capacitor
   useEffect(() => {
     initCapacitor().catch(console.error);
@@ -136,9 +148,9 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen flex text-gray-800 dark:text-gray-200">
+    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen flex relative overflow-x-hidden text-gray-800 dark:text-gray-200">
       <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full lg:w-auto">
         {currentPage !== 'dashboard' && (
           <Header 
             toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 

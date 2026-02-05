@@ -34,16 +34,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, 
     <>
       {/* Overlay for mobile */}
       <div
-        className={`fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden transition-opacity ${
+        className={`fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setOpen(false)}
       ></div>
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-800 w-64 shadow-xl z-20 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-800 w-64 shadow-xl z-40 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } flex flex-col`}
+        } flex flex-col overflow-y-auto`}
       >
         <div className="p-6 flex items-center justify-center border-b border-gray-200 dark:border-gray-700">
           <HealthGuardLogo />
