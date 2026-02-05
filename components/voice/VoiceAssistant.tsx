@@ -112,7 +112,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ isOpen, onClose, naviga
         es: "Llevándote al panel principal.",
         ta: "முகப்புக்கு அழைத்துச் செல்கிறது."
       },
-      disease: {
+      predictor: {
         en: "Opening the disease predictor. You can describe your symptoms there.",
         es: "Abriendo el predictor de enfermedades. Puedes describir tus síntomas allí.",
         ta: "நோய் கணிப்பை திறக்கிறது. உங்கள் அறிகுறிகளை அங்கு விவரிக்கலாம்."
@@ -127,10 +127,10 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ isOpen, onClose, naviga
         es: "Abriendo planificador de dieta. Puedes crear tu plan de comidas personalizado allí.",
         ta: "உணவு திட்டத்தை திறக்கிறது."
       },
-      consult: {
-        en: "Opening doctor consultation. You can find and book doctors there.",
-        es: "Abriendo consulta médica. Puedes encontrar y reservar doctores allí.",
-        ta: "மருத்துவ ஆலோசனையை திறக்கிறது."
+      findDoctors: {
+        en: "Opening find doctors near you. You can find and book doctors there.",
+        es: "Abriendo búsqueda de médicos. Puedes encontrar y reservar doctores allí.",
+        ta: "உங்கள் அருகிலுள்ள மருத்துவர்களைக் கண்டறிய திறக்கிறது."
       },
       calendar: {
         en: "Opening your appointments calendar.",
@@ -142,11 +142,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ isOpen, onClose, naviga
         es: "Abriendo informes médicos. Puedes subir y analizar tus informes allí.",
         ta: "மருத்துவ அறிக்கைகளை திறக்கிறது."
       },
-      locations: {
-        en: "Opening nearby health services. You can find hospitals, clinics, and pharmacies there.",
-        es: "Abriendo servicios de salud cercanos. Puedes encontrar hospitales, clínicas y farmacias allí.",
-        ta: "அருகிலுள்ள சுகாதார சேவைகளை திறக்கிறது."
-      },
       profile: {
         en: "Opening your health profile.",
         es: "Abriendo tu perfil de salud.",
@@ -154,7 +149,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ isOpen, onClose, naviga
       }
     };
 
-    const langKey = language === 'es' ? 'es' : language === 'ta' ? 'ta' : 'en';
+    const langKey = language === 'ta' ? 'ta' : 'en';
     return messages[page][langKey] || messages[page].en;
   };
 

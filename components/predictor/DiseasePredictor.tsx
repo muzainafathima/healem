@@ -8,7 +8,7 @@ import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 
 interface DiseasePredictorProps {
-    navigate: (page: 'consult', props: { specialty: string }) => void;
+    navigate: (page: 'findDoctors', props: { specialty: string }) => void;
     userProfile: UserProfileData | null;
 }
 
@@ -163,7 +163,7 @@ const DiseasePredictor: React.FC<DiseasePredictorProps> = ({ navigate, userProfi
               <p className="mb-4 text-gray-600 dark:text-gray-400">
                 {t('predictor.suggestSpecialty')} <strong>{suggestedSpecialty}</strong> {t('predictor.specialist')}
               </p>
-              <Button onClick={() => navigate('consult', { specialty: suggestedSpecialty })}>
+              <Button onClick={() => navigate('findDoctors', { specialty: suggestedSpecialty })}>
                 {t('predictor.findDoctor')} {suggestedSpecialty} {t('predictor.doctorNearYou')}
               </Button>
             </div>

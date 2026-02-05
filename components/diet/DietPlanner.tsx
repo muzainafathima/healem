@@ -1,11 +1,15 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { getDietPlan } from '../../services/geminiService';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { DietPlanResponse, DailyPlan } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
+
+interface DietPlannerProps {
+  lifestyleData?: Record<string, string>;
+}
 
 const MealCard: React.FC<{ meal: DailyPlan }> = ({ meal }) => {
   return (
@@ -39,7 +43,7 @@ const MealCard: React.FC<{ meal: DailyPlan }> = ({ meal }) => {
 };
 
 
-const DietPlanner: React.FC = () => {
+const DietPlanner: React.FC<DietPlannerProps> = ({ lifestyleData }) => {
   const { t, getLanguageName } = useLanguage();
   const [formData, setFormData] = useState({
     goal: 'Weight Loss',
@@ -50,6 +54,25 @@ const DietPlanner: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DietPlanResponse | null>(null);
+
+  // Auto-adjust goal based on lifestyle data if available
+  useEffect(() => {
+    if (lifestyleData) {
+      // Adjust goal based on weight status
+      if (lifestyleData.weight === 'Overweight' || lifestyleData.weight === 'Obese') {
+        setFormData(prev => ({ ...prev, goal: 'Weight Loss' }));
+      } else if (lifestyleData.weight === 'Underweight') {
+        setFormData(prev => ({ ...prev, goal: 'Muscle Gain' }));
+      }
+      
+      // Adjust based on family history
+      if (lifestyleData.familyHistory?.includes('diabetes')) {
+        setFormData(prev => ({ ...prev, goal: 'Diabetes Management' }));
+      } else if (lifestyleData.familyHistory?.includes('heart')) {
+        setFormData(prev => ({ ...prev, goal: 'Heart Health' }));
+      }
+    }
+  }, [lifestyleData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -68,17 +91,24 @@ const DietPlanner: React.FC = () => {
       return;
     }
     
-    const plan = await getDietPlan(goal, preferences, allergies, calories, getLanguageName());
+    const plan = await getDietPlan(goal, preferences, allergies, calories, getLanguageName(), lifestyleData);
     if (plan) {
       setResult(plan);
     } else {
       setError('Failed to generate a diet plan. Please try again later.');
     }
     setLoading(false);
-  }, [formData]);
+  }, [formData, lifestyleData, getLanguageName]);
 
   return (
     <div className="max-w-6xl mx-auto">
+      {lifestyleData && (
+        <Card className="mb-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-l-4 border-green-500">
+          <p className="text-lg text-gray-800 dark:text-gray-100">
+            ✨ <strong>Great!</strong> We'll create a diet plan tailored to your lifestyle check results for better health outcomes.
+          </p>
+        </Card>
+      )}
       <Card>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

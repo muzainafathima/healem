@@ -67,8 +67,11 @@ export const findNearbyFacilities = async (query: string, lat: number, lon: numb
 };
 
 export const findNearbyDoctors = async (specialty: string, lat: number, lon: number): Promise<Doctor[]> => {
-    // The query can be a specialty like "Cardiology" or just "doctor"
-    const query = specialty || 'doctor';
+    // Search for medical facilities like clinics and doctors' offices
+    // If specialty is "all", search for general medical facilities
+    const searchTerms = specialty && specialty !== 'all' 
+        ? [`${specialty} doctor`, `${specialty} clinic`, 'doctor', 'clinic', 'medical center']
+        : ['doctor', 'clinic', 'medical center', 'hospital'];
     
     // Bounding box for the viewbox parameter to prioritize local results
     const DOCTOR_VIEWBOX_RADIUS_KM = 20;
@@ -81,26 +84,27 @@ export const findNearbyDoctors = async (specialty: string, lat: number, lon: num
     const lat2 = lat + latDelta;
     const viewbox = `${lon1},${lat2},${lon2},${lat1}`;
 
-    // Nominatim query using viewbox to hint at the location and extratags for more details.
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=1&limit=50&extratags=1`;
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        const data: NominatimFacilityResult[] = await response.json();
-        
-        // Map the results to the Doctor type
-        const doctors: Doctor[] = data.map(item => {
+    const allDoctors: Doctor[] = [];
+    
+    // Try multiple search queries to find medical facilities
+    for (const searchTerm of searchTerms) {
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchTerm)}&viewbox=${viewbox}&bounded=1&limit=20&extratags=1`;
+            
+            const response = await fetch(url);
+            if (!response.ok) continue;
+            
+            const data: NominatimFacilityResult[] = await response.json();
+            
+            // Map the results to the Doctor type
+            const doctors: Doctor[] = data.map(item => {
                 const nameParts = item.display_name.split(',');
                 const name = nameParts[0] || item.display_name;
                 
                 return {
                     id: item.osm_id,
                     name: name,
-                    // Assign the specialty that was searched for, as Nominatim doesn't provide a structured one.
-                    specialty: specialty || 'General Practice',
+                    specialty: specialty && specialty !== 'all' ? specialty : 'General Practice',
                     address: item.display_name,
                     lat: parseFloat(item.lat),
                     lng: parseFloat(item.lon),
@@ -108,10 +112,21 @@ export const findNearbyDoctors = async (specialty: string, lat: number, lon: num
                     website: item.extratags?.website,
                 };
             });
-        
-        return doctors;
-    } catch (error) {
-        console.error(`Failed to find nearby doctors for query "${query}":`, error);
-        return [];
+            
+            allDoctors.push(...doctors);
+            
+            // If we found enough results, break early
+            if (allDoctors.length >= 10) break;
+        } catch (error) {
+            console.error(`Failed to search for "${searchTerm}":`, error);
+        }
     }
+    
+    // Remove duplicates based on osm_id
+    const uniqueDoctors = allDoctors.filter((doctor, index, self) => 
+        index === self.findIndex((d) => d.id === doctor.id)
+    );
+    
+    console.log(`Found ${uniqueDoctors.length} unique medical facilities`);
+    return uniqueDoctors;
 };

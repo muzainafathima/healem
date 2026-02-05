@@ -4,7 +4,6 @@ import { useLanguage, languageNames, Language } from '../../contexts/LanguageCon
 export const LanguageSwitcher: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,9 +18,6 @@ export const LanguageSwitcher: React.FC = () => {
   }, []);
 
   const languages = Object.entries(languageNames) as [Language, string][];
-  const filteredLanguages = languages.filter(([_, name]) =>
-    name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -39,26 +35,14 @@ export const LanguageSwitcher: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden flex flex-col">
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-            <input
-              type="text"
-              placeholder={t('language.select')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-          </div>
-          
-          <div className="overflow-y-auto max-h-80">
-            {filteredLanguages.map(([code, name]) => (
+        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+          <div className="py-1">
+            {languages.map(([code, name]) => (
               <button
                 key={code}
                 onClick={() => {
                   setLanguage(code);
                   setIsOpen(false);
-                  setSearchTerm('');
                 }}
                 className={`w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors ${
                   language === code
@@ -76,11 +60,6 @@ export const LanguageSwitcher: React.FC = () => {
                 </div>
               </button>
             ))}
-            {filteredLanguages.length === 0 && (
-              <div className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                No languages found
-              </div>
-            )}
           </div>
         </div>
       )}

@@ -6,8 +6,7 @@ import DiseasePredictor from './components/predictor/DiseasePredictor';
 import RiskAnalysis from './components/risk/RiskAnalysis';
 import EReports from './components/reports/EReports';
 import DietPlanner from './components/diet/DietPlanner';
-import EConsultation from './components/consult/EConsultation';
-import LocationsMap from './components/locations/LocationsMap';
+import FindDoctors from './components/findDoctors/FindDoctors';
 import AppointmentCalendar from './components/calendar/AppointmentCalendar';
 import UserProfile from './components/profile/UserProfile';
 import Intro from './components/intro/Intro';
@@ -18,8 +17,9 @@ import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import useDarkMode from './hooks/useDarkMode';
 import { onAuthChange, signOutUser } from './services/firebaseService';
 import type { AppUser, UserProfileData } from './types';
+import { initializeApp as initCapacitor } from './utils/capacitor';
 
-export type Page = 'dashboard' | 'predictor' | 'risk' | 'reports' | 'diet' | 'consult' | 'locations' | 'calendar' | 'profile';
+export type Page = 'dashboard' | 'predictor' | 'risk' | 'reports' | 'diet' | 'findDoctors' | 'calendar' | 'profile';
 
 const AppContent: React.FC = () => {
   const { t } = useLanguage();
@@ -32,6 +32,10 @@ const AppContent: React.FC = () => {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
 
+  // Initialize Capacitor
+  useEffect(() => {
+    initCapacitor().catch(console.error);
+  }, []);
 
   // Show intro screen for a short duration
   useEffect(() => {
@@ -88,25 +92,23 @@ const AppContent: React.FC = () => {
     if (!user) return null;
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard navigate={handleNavigate} />;
+        return <Dashboard navigate={handleNavigate} toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />;
       case 'predictor':
-        return <DiseasePredictor userProfile={userProfile} navigate={handleNavigate as (page: 'consult', props: { specialty: string }) => void} />;
+        return <DiseasePredictor userProfile={userProfile} navigate={handleNavigate as (page: 'findDoctors', props: { specialty: string }) => void} />;
       case 'risk':
-        return <RiskAnalysis userProfile={userProfile} />;
+        return <RiskAnalysis userProfile={userProfile} navigate={handleNavigate as (page: 'diet', props: { lifestyleData: Record<string, string> }) => void} />;
       case 'reports':
         return <EReports />;
       case 'diet':
-        return <DietPlanner />;
-      case 'consult':
-        return <EConsultation user={user} {...pageProps.consult} />;
-      case 'locations':
-        return <LocationsMap />;
+        return <DietPlanner lifestyleData={pageProps.diet?.lifestyleData} />;
+      case 'findDoctors':
+        return <FindDoctors />;
       case 'calendar':
         return <AppointmentCalendar user={user} />;
       case 'profile':
         return <UserProfile userProfile={userProfile} onProfileUpdate={handleProfileUpdate} />;
       default:
-        return <Dashboard navigate={handleNavigate} />;
+        return <Dashboard navigate={handleNavigate} toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />;
     }
   };
   
@@ -116,8 +118,7 @@ const AppContent: React.FC = () => {
     risk: t('title.risk'),
     reports: t('title.reports'),
     diet: t('title.diet'),
-    consult: t('title.consult'),
-    locations: t('title.locations'),
+    findDoctors: t('title.findDoctors'),
     calendar: t('title.calendar'),
     profile: t('title.profile')
   };
@@ -137,17 +138,19 @@ const AppContent: React.FC = () => {
   return (
     <div className="bg-gray-100 dark:bg-gray-900 min-h-screen flex text-gray-800 dark:text-gray-200">
       <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col transition-all duration-300">
-        <Header 
-          toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 
-          pageTitle={pageTitles[currentPage]}
-          isDarkMode={isDarkMode}
-          toggleDarkMode={toggleDarkMode}
-          handleLogout={handleLogout}
-          navigate={handleNavigate}
-          userProfile={userProfile}
-        />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0">
+        {currentPage !== 'dashboard' && (
+          <Header 
+            toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 
+            pageTitle={pageTitles[currentPage]}
+            isDarkMode={isDarkMode}
+            toggleDarkMode={toggleDarkMode}
+            handleLogout={handleLogout}
+            navigate={handleNavigate}
+            userProfile={userProfile}
+          />
+        )}
+        <main className={`flex-1 ${currentPage !== 'dashboard' ? 'p-4 sm:p-6 lg:p-8' : ''} overflow-y-auto`}>
           {renderPage()}
         </main>
       </div>

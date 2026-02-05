@@ -1,4 +1,4 @@
-# HealthGuard2 - Vercel Deployment Instructions
+# HEAL'EM - Vercel Deployment Instructions
 
 This repository is a Vite + React TypeScript app. To deploy to Vercel, follow either the GitHub integration flow or use the Vercel CLI.
 

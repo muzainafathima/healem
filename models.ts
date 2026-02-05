@@ -162,7 +162,7 @@ export const runLocalDiseasePredictionModel = (
   };
 };
 
-/* HEALTH RISK ANALYSIS MODEL*/
+/* LIFESTYLE CHECK MODEL*/
 export const runLocalRiskAnalysisModel = (healthData: Record<string, string>): RiskAnalysisResponse => {
   const scores: { [key: string]: number } = {
     'Heart Disease': 10,
@@ -573,7 +573,7 @@ export const runLocalChatbotModel = (
 
   // Keyword-to-response mapping
   const responses: Record<string, string> = {
-    'hello': "Hello! I'm your HealthGuard AI assistant. I can help answer general health questions, guide you through our features, and provide information about symptoms, nutrition, and wellness. How can I assist you today?",
+    'hello': "Hello! I'm your HEAL'EM assistant. I can help answer general health questions, guide you through our features, and provide information about symptoms, nutrition, and wellness. How can I assist you today?",
     'hi': "Hi there! I'm here to help with your health-related questions. What would you like to know?",
     
     'symptom': "I understand you're experiencing symptoms. For AI-powered analysis, I recommend using our Disease Predictor tool. It can provide potential diagnoses based on your symptoms, age, and medical history. However, for urgent or severe symptoms, please consult a healthcare professional immediately. Can you tell me more about what you're experiencing?",
@@ -598,15 +598,15 @@ export const runLocalChatbotModel = (
     
     'medicine': "⚠️ Important: Never take medication without consulting a healthcare professional. If you have a prescription: (1) Follow dosage instructions exactly, (2) Take at prescribed times, (3) Complete full course even if feeling better (especially antibiotics), (4) Be aware of potential side effects, (5) Check for drug interactions, (6) Store properly, (7) Don't share prescriptions. Always inform doctors of all medications you're taking.",
     
-    'risk': "Our AI Health Risk Analysis tool can assess your risk for conditions like heart disease, diabetes, and cancer based on lifestyle factors. It analyzes: age, exercise habits, diet quality, smoking status, alcohol consumption, stress levels, sleep patterns, family history, weight, blood pressure, and gender-specific factors. Want to try it?",
+    'risk': "Our Lifestyle Check tool provides a friendly assessment of your health habits! It analyzes: age, exercise habits, diet quality, smoking status, alcohol consumption, stress levels, sleep patterns, family history, weight, blood pressure, and gender-specific factors. You'll get personalized, easy-to-follow tips based on your lifestyle. Want to try it?",
     
     'report': "Our E-Reports Analysis feature uses AI to interpret medical lab reports! Upload an image of your report, and the AI will: (1) Extract key parameters (cholesterol, blood sugar, etc.), (2) Compare to normal ranges, (3) Explain what each value means in simple terms, (4) Provide helpful analogies, (5) Give personalized recommendations. Would you like to upload a report?",
     
-    'diabetes': "Type 2 diabetes is a metabolic disorder affecting blood sugar regulation. Risk factors: obesity, physical inactivity, family history, age 45+, certain ethnicities. Prevention: (1) Maintain healthy weight, (2) Exercise regularly (150+ min/week), (3) Eat balanced diet rich in fiber, (4) Limit sugar and refined carbs, (5) Regular health screenings. Our Risk Analysis tool can assess your diabetes risk!",
+    'diabetes': "Type 2 diabetes is a metabolic disorder affecting blood sugar regulation. Risk factors: obesity, physical inactivity, family history, age 45+, certain ethnicities. Prevention: (1) Maintain healthy weight, (2) Exercise regularly (150+ min/week), (3) Eat balanced diet rich in fiber, (4) Limit sugar and refined carbs, (5) Regular health screenings. Our Lifestyle Check tool can help you assess your habits!",
     
     'heart': "Heart disease is the leading cause of death globally. Risk factors: high blood pressure, high cholesterol, smoking, obesity, diabetes, physical inactivity, family history. Prevention: (1) Heart-healthy diet (Mediterranean or DASH), (2) Regular exercise, (3) Maintain healthy weight, (4) Don't smoke, (5) Manage stress, (6) Control blood pressure and cholesterol, (7) Limit alcohol. Get regular check-ups and screenings!",
     
-    'weight': "Healthy weight management involves: (1) Balanced diet with appropriate calorie intake, (2) Regular physical activity, (3) Adequate sleep, (4) Stress management, (5) Mindful eating practices, (6) Gradual changes (1-2 lbs/week is healthy), (7) Focus on sustainable habits, not quick fixes. Our Diet Planner and Risk Analysis tools can support your weight management journey!",
+    'weight': "Healthy weight management involves: (1) Balanced diet with appropriate calorie intake, (2) Regular physical activity, (3) Adequate sleep, (4) Stress management, (5) Mindful eating practices, (6) Gradual changes (1-2 lbs/week is healthy), (7) Focus on sustainable habits, not quick fixes. Our Diet Planner and Lifestyle Check tools can support your weight management journey!",
     
     'mental': "Mental health is as important as physical health. Resources: (1) Therapy/counseling (cognitive behavioral therapy is evidence-based), (2) Meditation and mindfulness, (3) Regular exercise (proven to reduce anxiety/depression), (4) Social connections, (5) Adequate sleep, (6) Limit alcohol/substances, (7) Crisis hotlines available 24/7. If experiencing severe symptoms or suicidal thoughts, seek immediate professional help or call emergency services."
   };
@@ -620,7 +620,7 @@ export const runLocalChatbotModel = (
 
   // Check for questions about app features
   if (messageLower.includes('feature') || messageLower.includes('what can you do') || messageLower.includes('help')) {
-    return "I can help you with:\n\n🔍 Disease Predictor - Analyze symptoms and get potential diagnoses\n📊 Health Risk Analysis - Assess long-term health risks based on lifestyle\n📄 E-Reports Analysis - Interpret medical lab reports with AI\n🥗 Diet Planner - Create personalized meal plans\n👨‍⚕️ E-Consultation - Find and book doctor appointments\n🗺️ Nearby Health Services - Locate hospitals, clinics, and pharmacies\n💬 Chat Support - Ask health questions anytime\n\nWhat would you like to explore?";
+    return "I can help you with:\n\n🔍 Disease Predictor - Analyze symptoms and get potential diagnoses\n📊 Lifestyle Check - Get a friendly assessment of your health habits\n📄 E-Reports Analysis - Interpret medical lab reports with AI\n🥗 Diet Planner - Create personalized meal plans\n👨‍⚕️ E-Consultation - Find and book doctor appointments\n🗺️ Nearby Health Services - Locate hospitals, clinics, and pharmacies\n💬 Chat Support - Ask health questions anytime\n\nWhat would you like to explore?";
   }
 
   // Check for emergency keywords
@@ -629,7 +629,7 @@ export const runLocalChatbotModel = (
   }
 
   // Default response
-  return "I'm here to help with health-related questions and guide you through HealthGuard AI's features!\n\nI can assist with:\n✓ Understanding symptoms and potential conditions\n✓ Nutrition and diet guidance\n✓ Exercise and fitness advice\n✓ Mental health and stress management\n✓ Sleep and wellness tips\n✓ Navigating our health tools\n\n💡 Tip: Ask specific questions like 'What foods help lower cholesterol?' or 'How can I improve my sleep quality?'\n\n⚠️ Important: This chatbot provides general health information and cannot replace professional medical advice. For diagnoses, treatment, or medical emergencies, consult a qualified healthcare provider.\n\nWhat would you like to know?";
+  return "I'm here to help with health-related questions and guide you through HEAL'EM's features!\n\nI can assist with:\n✓ Understanding symptoms and potential conditions\n✓ Nutrition and diet guidance\n✓ Exercise and fitness advice\n✓ Mental health and stress management\n✓ Sleep and wellness tips\n✓ Navigating our health tools\n\n💡 Tip: Ask specific questions like 'What foods help lower cholesterol?' or 'How can I improve my sleep quality?'\n\n⚠️ Important: This chatbot provides general health information and cannot replace professional medical advice. For diagnoses, treatment, or medical emergencies, consult a qualified healthcare provider.\n\nWhat would you like to know?";
 };
 
 /**

@@ -10,6 +10,7 @@ import Spinner from '../ui/Spinner';
 
 interface RiskAnalysisProps {
     userProfile: UserProfileData | null;
+    navigate?: (page: 'diet', props: { lifestyleData: Record<string, string> }) => void;
 }
 
 const baseQuestions = [
@@ -73,7 +74,7 @@ const GaugeChart = ({ value, name }: { value: number, name: string }) => {
   );
 };
 
-const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
+const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile, navigate }) => {
   const { t, getLanguageName } = useLanguage();
   const [formData, setFormData] = useState({
     age: userProfile?.age || '',
@@ -137,7 +138,7 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
       setResult(analysis);
     } else {
       console.error('❌ Risk analysis failed');
-      setError('Failed to get risk analysis. Please check the browser console for detailed error information and try again later.');
+      setError('Failed to get lifestyle check. Please check the browser console for detailed error information and try again later.');
     }
     setLoading(false);
   }, [formData]);
@@ -147,12 +148,16 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
 
     return (
       <Card className="mt-8">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Health Risk Analysis</h2>
-        <div className="p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 mb-6">
-          <p><span className="font-bold">Disclaimer:</span> {result.disclaimer}</p>
+        {/* Positive Framing Opener */}
+        <div className="mb-6 p-5 rounded-lg bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-l-4 border-green-500">
+          <p className="text-lg text-gray-800 dark:text-gray-100 leading-relaxed">
+            🌟 <strong>Great job checking in on your health!</strong> Here's a friendly look at what your lifestyle shows and how small daily tweaks can help you feel even better.
+          </p>
         </div>
+
+        <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Your Lifestyle Check</h2>
         
-        <h3 className="text-xl font-semibold mb-4 text-center">Your Risk Scoreboard</h3>
+        <h3 className="text-xl font-semibold mb-4 text-center">Your Health Snapshot</h3>
         <div className="flex flex-wrap justify-center gap-4 mb-8">
           {result.risk_scoreboard.map(risk => (
             <div key={risk.risk_category} className="flex flex-col items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
@@ -162,10 +167,67 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
           ))}
         </div>
         
+        {/* Quick Lifestyle Snapshot */}
+        <div className="mb-6 p-5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <h3 className="text-lg font-semibold mb-3 text-blue-900 dark:text-blue-200">📋 Quick Lifestyle Snapshot</h3>
+          <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+            <li className="flex items-start">
+              <span className="mr-2">🍽️</span>
+              <span><strong>Diet:</strong> Choose lighter cooking—try steamed idli, ragi dosa, or moong dal over heavy fried items. Add a handful of greens to your sambar daily.</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">🚶</span>
+              <span><strong>Activity:</strong> A short 15-20 minute evening walk can boost your energy and mood. Every step counts!</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">💤</span>
+              <span><strong>Rest & Hydration:</strong> Aim for 7-8 hours of sleep and drink plenty of water throughout the day—it helps everything work better.</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">😌</span>
+              <span><strong>Stress:</strong> Take short breaks, practice deep breathing, or try light yoga to keep stress in check.</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Practical Micro-Tips */}
+        <div className="mb-6 p-5 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+          <h3 className="text-lg font-semibold mb-3 text-green-900 dark:text-green-200">✨ 5 Easy Steps You Can Start Today</h3>
+          <ol className="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+            <li>Add a handful of spinach or methi to your sambar or curry</li>
+            <li>Take a 10-15 minute walk after dinner—it aids digestion</li>
+            <li>Swap sugary drinks with buttermilk, nimbu paani, or coconut water</li>
+            <li>Include one serving of whole grains like brown rice or ragi in your day</li>
+            <li>Set a regular bedtime and wake-up time, even on weekends</li>
+          </ol>
+        </div>
+
         <h3 className="text-xl font-semibold mb-2">Personalized Recommendations</h3>
-        <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
+        <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-6">
             {result.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
         </ul>
+
+        {/* Diet Planner Navigation */}
+        {navigate && (
+          <div className="mb-6">
+            <Button 
+              onClick={() => navigate('diet', { lifestyleData: formData })} 
+              className="w-full"
+            >
+              🥗 Get Personalized Diet Plan Based on Your Lifestyle
+            </Button>
+          </div>
+        )}
+
+        {/* Motivational Close + Disclaimer */}
+        <div className="p-5 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+          <p className="text-gray-800 dark:text-gray-100 mb-3">
+            💪 <strong>Small steps add up—you've got this!</strong> Track how you feel in a week and celebrate your progress.
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+            <span className="font-semibold">Important:</span> {result.disclaimer} These are general lifestyle ideas only—please consult your doctor for personalized medical advice.
+          </p>
+        </div>
       </Card>
     );
   };
@@ -222,13 +284,13 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile }) => {
             </div>
             <div className="mt-8">
                 <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
-                Analyze My Risk
+                Check My Lifestyle
                 </Button>
             </div>
             {error && <p className="text-red-500 text-sm text-center mt-4">{error}</p>}
         </form>
       </Card>
-      {loading && <div className="mt-8"><Spinner message="AI is calculating your risk profile..." /></div>}
+      {loading && <div className="mt-8"><Spinner message="AI is analyzing your lifestyle habits..." /></div>}
       {result && renderResult()}
     </div>
   );

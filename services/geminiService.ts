@@ -105,8 +105,8 @@ export const getRiskAnalysis = async (healthData: Record<string, string>, langua
     const prompt = `
       IMPORTANT: Respond entirely in ${language} language.
       
-      Analyze the following comprehensive health data for a user and provide a detailed health risk analysis.
-      The data includes personal details, lifestyle habits, and known health indicators.
+      Analyze the following comprehensive health data for a user and provide a supportive lifestyle check.
+      The data includes personal details, lifestyle habits, and known health indicators. Use positive, encouraging language.
       
       Health Data:
       - Age: ${healthData.age}
@@ -123,7 +123,7 @@ export const getRiskAnalysis = async (healthData: Record<string, string>, langua
       
       ${genderSpecificPrompts}
       
-      Based on ALL this data, provide a JSON response in ${language} with a disclaimer, a risk scoreboard for Heart Disease, Type 2 Diabetes, and General Cancers. If gender-specific data is provided, incorporate risks like Breast Cancer, Ovarian Cancer, or PCOS for females, and Prostate Cancer for males into your analysis and scoreboard where relevant. Each item in the scoreboard should have a 'risk_category', a 'score' from 0 (very low risk) to 100 (very high risk), and a brief 'explanation' for the score. Also, provide 3-5 personalized, actionable 'recommendations' for risk reduction based on the user's specific inputs.
+      Based on ALL this data, provide a JSON response in ${language} with a supportive disclaimer, a lifestyle scoreboard for Heart Health, Blood Sugar Balance, and General Wellness. If gender-specific data is provided, incorporate areas like Women's Health or Men's Health into your analysis where relevant. Each item in the scoreboard should have a 'risk_category', a 'score' from 0 (excellent lifestyle habits) to 100 (needs attention), and a brief positive 'explanation' for the score using supportive language. Also, provide 3-5 personalized, actionable 'recommendations' for lifestyle improvements based on the user's specific inputs, using encouraging and culturally relevant language.
     `;
     
     const schema = {
@@ -214,7 +214,33 @@ export const analyzeMedicalReport = async (reportImageBase64: string, mimeType: 
     }
 };
 
-export const getDietPlan = async (goal: string, preferences: string, allergies: string, calories: string, language: string = 'English'): Promise<DietPlanResponse | null> => {
+export const getDietPlan = async (goal: string, preferences: string, allergies: string, calories: string, language: string = 'English', lifestyleData?: Record<string, string>): Promise<DietPlanResponse | null> => {
+    let lifestyleContext = '';
+    if (lifestyleData) {
+        lifestyleContext = `
+        
+        IMPORTANT LIFESTYLE CONTEXT FROM USER'S HEALTH CHECK:
+        - Age: ${lifestyleData.age}
+        - Gender: ${lifestyleData.gender}
+        - Exercise Frequency: ${lifestyleData.exercise}
+        - Current Diet Quality: ${lifestyleData.diet}
+        - Smoking Status: ${lifestyleData.smoking}
+        - Alcohol Consumption: ${lifestyleData.alcohol}
+        - Stress Level: ${lifestyleData.stress}
+        - Sleep Quality: ${lifestyleData.sleep}
+        - Family Health History: ${lifestyleData.familyHistory}
+        - Weight Status: ${lifestyleData.weight}
+        - Blood Pressure: ${lifestyleData.bloodPressure}
+        
+        Please tailor the diet plan to address these specific lifestyle factors. For example:
+        - If stress is high, include stress-reducing foods
+        - If sleep is poor, suggest foods that promote better sleep
+        - If exercise is low, provide energy-boosting meals
+        - If diet quality is poor, focus on whole foods and nutrition education
+        - Consider any health risks indicated by family history
+        `;
+    }
+    
     const prompt = `
         IMPORTANT: Respond entirely in ${language} language.
         
@@ -223,8 +249,9 @@ export const getDietPlan = async (goal: string, preferences: string, allergies: 
         - Dietary Preferences: ${preferences}
         - Allergies: ${allergies}
         - Target Daily Calories: ${calories}
+        ${lifestyleContext}
 
-        Provide a JSON response in ${language} with a disclaimer, a 3-day plan (each day having breakfast, lunch, dinner, and snacks with name, description, and estimated calories), a "daily_focus" for each day, and general hydration tips.
+        Provide a JSON response in ${language} with a disclaimer, a 3-day plan (each day having breakfast, lunch, dinner, and snacks with name, description, and estimated calories), a "daily_focus" for each day, and general hydration tips. Use Indian/Tamil Nadu-friendly food examples where possible (idli, dosa, sambar, ragi, etc.).
     `;
 
     const mealSchema = {
@@ -281,7 +308,7 @@ export const getChatResponse = async (userMessage: string, language: string = 'E
         const prompt = `
             IMPORTANT: Respond entirely in ${language} language.
             
-            You are a helpful health assistant for HealthGuard AI. 
+            You are a helpful health assistant for HEAL'EM. 
             Provide helpful, empathetic, and accurate health information while being conversational.
             Always remind users that you're an AI assistant and not a replacement for professional medical advice.
             Keep responses concise but informative.

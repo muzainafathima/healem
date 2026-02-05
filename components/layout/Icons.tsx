@@ -1,16 +1,7 @@
 import React from 'react';
 
 export const HealthGuardLogo = () => (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L4 6v5.33C4 16.51 7.42 21.5 12 22c4.58-.5 8-5.49 8-10.67V6l-8-4zm0 18c-3.35-.45-6-4.52-6-8.67V8.19l6-3.06 6 3.06v3.14C18 15.48 15.35 19.55 12 20z" fill="url(#grad1)"/>
-        <path d="M11 14.5l-2-2 1.41-1.41L11 11.67l3.59-3.58L16 9.5l-5 5z" fill="url(#grad1)"/>
-        <defs>
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{stopColor: 'rgb(37, 99, 235)', stopOpacity: 1}} />
-            <stop offset="100%" style={{stopColor: 'rgb(56, 189, 248)', stopOpacity: 1}} />
-            </linearGradient>
-        </defs>
-    </svg>
+    <img src="/healem2.png" alt="HEAL'EM Logo" className="w-8 h-8 object-contain" />
 );
 export const DashboardIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>

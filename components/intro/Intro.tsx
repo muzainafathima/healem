@@ -1,5 +1,5 @@
 import React from 'react';
-import { HealthGuardLogo } from '../layout/Icons';
+import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 const Intro: React.FC = () => {
@@ -8,8 +8,7 @@ const Intro: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 animate-fadeIn">
       <div className="flex items-center">
-        <HealthGuardLogo />
-        <h1 className="text-4xl md:text-5xl font-bold ml-4 text-gray-800 dark:text-white">HealthGuard&nbsp;AI</h1>
+        <img src="/healem.jpg" alt="HEAL'EM" className="h-32 md:h-40" />
       </div>
       <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">{t('intro.tagline')}</p>
       <style>{`

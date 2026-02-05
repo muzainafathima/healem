@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { signUp, signIn } from '../../services/firebaseService';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { HealthGuardLogo } from '../layout/Icons';
 
 const Auth: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -57,9 +56,8 @@ const Auth: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4">
-             <div className="flex items-center mb-8">
-                <HealthGuardLogo />
-                <h1 className="text-3xl font-bold ml-4 text-gray-800 dark:text-white">HealthGuard AI</h1>
+             <div className="flex items-center justify-center mb-8">
+                <img src="/healem.jpg" alt="HEAL'EM" className="h-20" />
             </div>
             <Card className="w-full max-w-md">
                 <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">

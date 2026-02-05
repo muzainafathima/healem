@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import L from 'leaflet';
+import { Geolocation } from '@capacitor/geolocation';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
@@ -7,6 +8,7 @@ import type { HealthcareFacility } from '../../types';
 import { geocodeAddress, findNearbyFacilities } from '../../services/locationService';
 import { SearchIcon, LocationMarkerIcon } from '../layout/Icons';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { isNativePlatform } from '../../utils/capacitor';
 
 // Haversine formula
 const haversineDistance = (lat1: number | undefined, lon1: number | undefined, lat2: number, lon2: number) => {
@@ -64,20 +66,39 @@ const LocationsMap: React.FC = () => {
         setIsLocating(false);
     };
 
-    const handleUseMyLocation = () => {
+    const handleUseMyLocation = async () => {
         setIsLocating(true);
         setLocationError('');
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        
+        try {
+            if (isNativePlatform()) {
+                // Use Capacitor Geolocation for native platforms
+                const position = await Geolocation.getCurrentPosition();
+                setLocation({ 
+                    lat: position.coords.latitude, 
+                    lng: position.coords.longitude 
+                });
                 setSearchQuery("My Current Location");
-                setIsLocating(false);
-            },
-            () => {
-                setLocationError("Unable to retrieve your location. Please enable location services.");
-                setIsLocating(false);
+            } else {
+                // Use browser geolocation for web
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        setLocation({ 
+                            lat: position.coords.latitude, 
+                            lng: position.coords.longitude 
+                        });
+                        setSearchQuery("My Current Location");
+                    },
+                    () => {
+                        setLocationError("Unable to retrieve your location. Please enable location services.");
+                    }
+                );
             }
-        );
+        } catch (error) {
+            setLocationError("Unable to retrieve your location. Please enable location services.");
+        } finally {
+            setIsLocating(false);
+        }
     };
 
     useEffect(() => {

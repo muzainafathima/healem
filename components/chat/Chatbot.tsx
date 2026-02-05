@@ -15,7 +15,7 @@ const Chatbot: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: t('chat.placeholder') || 'Hello! I\'m your HealthGuard AI assistant. How can I help you with your health concerns today?',
+            content: t('chat.placeholder') || 'Hello! I\'m your HEAL\'EM assistant. How can I help you with your health concerns today?',
             timestamp: new Date()
         }
     ]);
@@ -98,7 +98,7 @@ const Chatbot: React.FC = () => {
                     <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                            <h3 className="font-semibold">HealthGuard AI Assistant</h3>
+                            <h3 className="font-semibold">HEAL'EM Assistant</h3>
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
