@@ -21,14 +21,59 @@ import { initializeApp as initCapacitor } from './utils/capacitor';
 
 export type Page = 'dashboard' | 'predictor' | 'risk' | 'reports' | 'diet' | 'findDoctors' | 'calendar' | 'profile';
 
+const PageBackground: React.FC<{ page: Page; isDarkMode: boolean }> = ({ page, isDarkMode }) => {
+  const [bgImage, setBgImage] = useState('');
+
+  useEffect(() => {
+    switch (page) {
+      case 'dashboard':
+      case 'profile':
+        setBgImage('/dashboard_bg.png');
+        break;
+      case 'predictor':
+      case 'risk':
+      case 'reports':
+      case 'findDoctors':
+        setBgImage('/medical_bg.png');
+        break;
+      case 'diet':
+        setBgImage('/diet_bg.png');
+        break;
+      case 'calendar':
+        setBgImage('/calendar_bg.png');
+        break;
+      default:
+        setBgImage('/dashboard_bg.png');
+    }
+  }, [page]);
+
+  if (!bgImage) return null;
+
+  return (
+    <div 
+      className={`fixed inset-0 pointer-events-none transition-opacity duration-700 ease-in-out z-0 ${
+        isDarkMode ? 'opacity-[0.20] mix-blend-screen invert grayscale' : 'opacity-[0.12] mix-blend-multiply grayscale'
+      }`}
+      style={{
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    />
+  );
+};
+
 const AppContent: React.FC = () => {
   const { t } = useLanguage();
-  const [isIntro, setIsIntro] = useState(true);
+  const [isIntroVisible, setIsIntroVisible] = useState(true);
+  const [isIntroMounted, setIsIntroMounted] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
   const [user, setUser] = useState<AppUser | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [pageProps, setPageProps] = useState<Record<string, any>>({});
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
 
@@ -49,10 +94,14 @@ const AppContent: React.FC = () => {
     initCapacitor().catch(console.error);
   }, []);
 
-  // Show intro screen for a short duration
+  // Show intro screen and gracefully fade it out
   useEffect(() => {
-    const timer = setTimeout(() => setIsIntro(false), 2500);
-    return () => clearTimeout(timer);
+    const fadeTimer = setTimeout(() => setIsIntroVisible(false), 2200);
+    const unmountTimer = setTimeout(() => setIsIntroMounted(false), 2900);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(unmountTimer);
+    };
   }, []);
 
   // Listen for Firebase auth state changes and load user profile
@@ -135,39 +184,59 @@ const AppContent: React.FC = () => {
     profile: t('title.profile')
   };
 
-  if (isIntro) {
-    return <Intro />;
-  }
-  
-  if (isInitializing) {
-    return <Spinner message={t('common.loading')} fullScreen />;
-  }
+  const renderContent = () => {
+    if (isInitializing) {
+      return <Spinner message={t('common.loading')} fullScreen />;
+    }
 
-  if (!user) {
-    return <Auth />;
-  }
+    if (!user) {
+      return <Auth />;
+    }
+
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900 h-screen flex relative overflow-hidden text-gray-800 dark:text-gray-200">
+        <PageBackground page={currentPage} isDarkMode={isDarkMode} />
+        <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} isOpen={isSidebarOpen} setOpen={setSidebarOpen} isCollapsed={isSidebarCollapsed} toggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)} />
+        <div className="flex-1 flex flex-col min-w-0 w-full lg:w-auto overflow-hidden">
+          {currentPage !== 'dashboard' && (
+            <Header 
+              toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 
+              pageTitle={pageTitles[currentPage]}
+              isDarkMode={isDarkMode}
+              toggleDarkMode={toggleDarkMode}
+              handleLogout={handleLogout}
+              navigate={handleNavigate}
+              userProfile={userProfile}
+            />
+          )}
+          <main className={`flex-1 ${currentPage !== 'dashboard' ? 'p-4 sm:p-6 lg:p-8' : ''} overflow-y-auto custom-scrollbar`}>
+            {renderPage()}
+          </main>
+        </div>
+        {/* Floating Chatbot - appears on all pages */}
+        <Chatbot />
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 h-screen flex relative overflow-hidden text-gray-800 dark:text-gray-200">
-      <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col min-w-0 w-full lg:w-auto overflow-hidden">
-        {currentPage !== 'dashboard' && (
-          <Header 
-            toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 
-            pageTitle={pageTitles[currentPage]}
-            isDarkMode={isDarkMode}
-            toggleDarkMode={toggleDarkMode}
-            handleLogout={handleLogout}
-            navigate={handleNavigate}
-            userProfile={userProfile}
-          />
-        )}
-        <main className={`flex-1 ${currentPage !== 'dashboard' ? 'p-4 sm:p-6 lg:p-8' : ''} overflow-y-auto custom-scrollbar`}>
-          {renderPage()}
-        </main>
+    <div className="bg-gray-50 dark:bg-gray-900 relative">
+      <div 
+        className={`w-full h-screen transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] transform ${
+          isIntroVisible ? 'scale-105 opacity-0 blur-md translate-y-4' : 'scale-100 opacity-100 blur-0 translate-y-0'
+        }`}
+      >
+        {renderContent()}
       </div>
-      {/* Floating Chatbot - appears on all pages */}
-      <Chatbot />
+      {isIntroMounted && (
+        <div 
+          className={`fixed inset-0 z-[100] transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] transform origin-top ${
+            isIntroVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-8 pointer-events-none'
+          }`}
+        >
+          <Intro />
+        </div>
+      )}
     </div>
   );
 };

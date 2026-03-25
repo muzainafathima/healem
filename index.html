@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/jpeg" href="/healem2.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -22,6 +22,13 @@
       .leaflet-container {
         height: 100%;
         width: 100%;
+      }
+      @keyframes softFadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      .animate-fade-in {
+        animation: softFadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
       }
       /* Mobile safe area padding */
       body {
@@ -61,16 +68,16 @@
       select,
       textarea {
         padding: 0.65rem 0.85rem !important;
-        border-radius: 0.5rem !important;
+        border-radius: 0.75rem !important;
         font-size: 0.925rem !important;
-        border: 1px solid rgba(156, 163, 175, 0.4) !important;
+        border: 1px solid rgba(229, 231, 235, 1) !important;
         transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
       }
       input:focus,
       select:focus,
       textarea:focus {
         border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
         outline: none !important;
       }
       .dark input[type="text"],

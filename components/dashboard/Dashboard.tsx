@@ -42,7 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate, toggleSidebar }) => {
       page: 'findDoctors' as Page,
       icon: <ConsultIcon />,
       title: t('dashboard.findDoctors.title'),
-      color: 'bg-purple-500 dark:bg-purple-600'
+      color: 'bg-blue-500 dark:bg-blue-600'
     }
   ];
 
@@ -61,14 +61,14 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate, toggleSidebar }) => {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Hamburger menu button - top left */}
+    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden min-h-[calc(100vh-4rem)]">
+      {/* Hamburger menu button - top left - mobile only! */}
       <button
         onClick={toggleSidebar}
-        className="fixed top-4 left-4 lg:top-6 lg:left-6 z-50 p-3 lg:p-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 text-white"
+        className="absolute top-4 left-4 lg:hidden z-50 p-3 rounded-full bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-600 dark:to-blue-700 shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 text-white"
         aria-label="Toggle menu"
       >
-        <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
@@ -142,7 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate, toggleSidebar }) => {
               : 'w-32 h-32 md:w-40 md:h-40'
           }`}
         >
-          <div className={`w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 shadow-2xl flex items-center justify-center transform transition-all duration-500 ${
+          <div className={`w-full h-full rounded-full bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-600 dark:to-blue-700 shadow-2xl flex items-center justify-center transform transition-all duration-500 ${
             isExpanded 
               ? 'rotate-180 scale-100' 
               : 'rotate-0 scale-100 hover:scale-110'

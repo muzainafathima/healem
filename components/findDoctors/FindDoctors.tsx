@@ -6,7 +6,7 @@ import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 import type { Doctor, HealthcareFacility, AppUser } from '../../types';
 import { SPECIALTIES, TIME_SLOTS } from '../../constants';
-import { geocodeAddress, findNearbyDoctors, findNearbyFacilities } from '../../services/locationService';
+import { geocodeAddress, findNearbyDoctors, findNearbyFacilities, reverseGeocodeAddress } from '../../services/locationService';
 import { bookAppointment } from '../../services/firebaseService';
 import { SearchIcon, LocationMarkerIcon, PhoneIcon, WebsiteIcon } from '../layout/Icons';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -195,34 +195,38 @@ const FindDoctors: React.FC<{ user?: AppUser }> = ({ user }) => {
     }
   };
 
+  // Fetch current location as Promise
+  const fetchUserLocation = (): Promise<{lat: number; lng: number}> => {
+    return new Promise((resolve, reject) => {
+      if (isNativePlatform()) {
+        Geolocation.getCurrentPosition()
+          .then(position => {
+            resolve({ lat: position.coords.latitude, lng: position.coords.longitude });
+          })
+          .catch(reject);
+      } else {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+          (error) => reject(error)
+        );
+      }
+    });
+  };
+
   // Handle get current location
   const handleGetCurrentLocation = async () => {
     setIsLocating(true);
     setLocationError('');
-
     try {
-      if (isNativePlatform()) {
-        const position = await Geolocation.getCurrentPosition();
-        setLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            });
-            setIsLocating(false);
-          },
-          () => {
-            setLocationError('Unable to retrieve your location. Please enter a location manually.');
-            setIsLocating(false);
-          }
-        );
-        return;
-      }
+      const loc = await fetchUserLocation();
+      setLocation(loc);
+      
+      const addressStr = await reverseGeocodeAddress(loc.lat, loc.lng);
+      if (addressStr) setSearchQuery(addressStr);
     } catch (error) {
       setLocationError('Unable to retrieve your location. Please enter a location manually.');
     } finally {
@@ -254,9 +258,20 @@ const FindDoctors: React.FC<{ user?: AppUser }> = ({ user }) => {
       }
     }
     
+    // If still no location (e.g., search query was empty), auto-fetch current location
     if (!currentLocation) {
-      alert(t('consult.enterLocation'));
-      return;
+      setIsSearching(true);
+      try {
+        currentLocation = await fetchUserLocation();
+        setLocation(currentLocation);
+        
+        const addressStr = await reverseGeocodeAddress(currentLocation.lat, currentLocation.lng);
+        if (addressStr) setSearchQuery(addressStr);
+      } catch (error) {
+        alert(t('consult.enterLocation'));
+        setIsSearching(false);
+        return;
+      }
     }
 
     setIsSearching(true);
@@ -274,13 +289,28 @@ const FindDoctors: React.FC<{ user?: AppUser }> = ({ user }) => {
 
   // Search for facilities (for map view)
   const searchFacilities = async () => {
-    if (!location) return;
+    let currentLocation = location;
+    
+    if (!currentLocation) {
+      setIsLoadingFacilities(true);
+      try {
+        currentLocation = await fetchUserLocation();
+        setLocation(currentLocation);
+        
+        const addressStr = await reverseGeocodeAddress(currentLocation.lat, currentLocation.lng);
+        if (addressStr) setSearchQuery(addressStr);
+      } catch (error) {
+        setLocationError('Unable to retrieve your location automatically.');
+        setIsLoadingFacilities(false);
+        return;
+      }
+    }
 
     setIsLoadingFacilities(true);
     try {
       const query = facilityType.toLowerCase();
-      console.log('Searching for facilities with query:', query, 'at location:', location);
-      const nearbyFacilities = await findNearbyFacilities(query, location.lat, location.lng);
+      console.log('Searching for facilities with query:', query, 'at location:', currentLocation);
+      const nearbyFacilities = await findNearbyFacilities(query, currentLocation.lat, currentLocation.lng);
       console.log('Found facilities:', nearbyFacilities);
       setFacilities(nearbyFacilities);
 
@@ -404,10 +434,10 @@ const FindDoctors: React.FC<{ user?: AppUser }> = ({ user }) => {
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <Button onClick={handleSearchLocation} disabled={isLocating}>
+              <Button onClick={handleSearchLocation} disabled={isLocating} className="h-[42px] overflow-hidden whitespace-nowrap min-w-[120px]">
                 {isLocating ? t('consult.searching') : t('common.search')}
               </Button>
-              <Button onClick={handleGetCurrentLocation} disabled={isLocating} variant="secondary">
+              <Button onClick={handleGetCurrentLocation} disabled={isLocating} variant="secondary" className="h-[42px]">
                 <div style={{width: '20px', height: '20px'}}>
                   <LocationMarkerIcon />
                 </div>
@@ -475,7 +505,7 @@ const FindDoctors: React.FC<{ user?: AppUser }> = ({ user }) => {
             </div>
 
             <div className="flex items-end">
-              <Button onClick={searchDoctors} disabled={isSearching} className="w-full">
+              <Button onClick={searchDoctors} disabled={isSearching} className="w-full h-[42px] overflow-hidden whitespace-nowrap">
                 {isSearching ? t('consult.searching') : t('consult.search')}
               </Button>
             </div>

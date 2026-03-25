@@ -8,9 +8,11 @@ interface SidebarProps {
   setCurrentPage: (page: Page, props?: any) => void;
   isOpen: boolean;
   setOpen: (isOpen: boolean) => void;
+  isCollapsed: boolean;
+  toggleCollapse: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, setOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, setOpen, isCollapsed, toggleCollapse }) => {
     const { t } = useLanguage();
     
     const navItems = [
@@ -26,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, 
     
     const handleNavigation = (page: Page) => {
         setCurrentPage(page);
-        // Always close sidebar after navigation
+        // Close mobile sidebar after navigation
         setOpen(false);
     };
   
@@ -41,36 +43,63 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, 
       ></div>
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-800 w-64 border-r border-gray-200 dark:border-gray-700 shadow-2xl lg:shadow-none z-40 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } flex flex-col overflow-y-auto custom-scrollbar`}
+        className={`fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-40 transform transition-all duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
+        } ${isCollapsed ? 'lg:w-[68px]' : 'lg:w-64'} flex flex-col overflow-hidden custom-scrollbar`}
       >
-        <div className="h-[57px] px-6 flex items-center justify-center border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <HealthGuardLogo />
-          <h1 className="text-2xl font-bold ml-3 text-gray-800 dark:text-white">HEAL'EM</h1>
+        {/* Logo Header */}
+        <div className="h-[57px] flex items-center border-b border-gray-200 dark:border-gray-700 shrink-0 overflow-hidden whitespace-nowrap">
+          <div className="flex items-center px-4 w-full h-full">
+            <HealthGuardLogo />
+            <h1 className={`text-2xl font-bold bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent dark:from-blue-400 dark:to-blue-300 transition-all duration-300 ${
+              isCollapsed ? 'opacity-0 max-w-0 ml-0' : 'opacity-100 max-w-[200px] ml-3'
+            }`}>HEAL'EM</h1>
+          </div>
         </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
+
+        {/* Navigation */}
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {navItems.map((item) => (
             <a
               key={item.id}
               href="#"
+              title={isCollapsed ? item.label : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 handleNavigation(item.id as Page);
               }}
-              className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
+              className={`flex items-center py-2.5 px-3.5 text-sm font-medium rounded-xl transition-all duration-300 group relative overflow-hidden ${
                 currentPage === item.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-l-4 border-blue-600 dark:border-blue-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:text-blue-600 dark:hover:text-blue-400'
               }`}
             >
-              <span className="mr-3">{item.icon}</span>
-              {item.label}
+              <span className="shrink-0">{item.icon}</span>
+              <span className={`whitespace-nowrap transition-all duration-300 ${
+                isCollapsed ? 'opacity-0 max-w-0 ml-0' : 'opacity-100 max-w-[200px] ml-3'
+              }`}>{item.label}</span>
             </a>
           ))}
         </nav>
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-center text-gray-500 dark:text-gray-400">&copy; 2026 HEAL'EM By IWASC Students</p>
+
+        {/* Collapse toggle button (desktop only) */}
+        <div className="hidden lg:block px-2 py-2 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={toggleCollapse}
+            className="w-full flex items-center justify-center p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:hover:text-blue-400 transition-colors"
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg className={`w-5 h-5 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div className={`overflow-hidden transition-all duration-300 whitespace-nowrap border-gray-200 dark:border-gray-700 ${
+            isCollapsed ? 'h-0 opacity-0 border-t-0 p-0' : 'h-[52px] opacity-100 border-t p-4'
+        }`}>
+            <p className="text-xs text-center text-gray-400 dark:text-gray-500">&copy; 2026 HEAL'EM By IWASC Students</p>
         </div>
       </aside>
     </>

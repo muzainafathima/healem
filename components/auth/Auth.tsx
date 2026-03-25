@@ -55,9 +55,9 @@ const Auth: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4">
+        <div className="animate-fade-in min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center items-center p-4">
              <div className="flex items-center justify-center mb-8">
-                <img src="/healem.jpg" alt="HEAL'EM" className="h-20" />
+                <img src="/healem.jpg" alt="HEAL'EM" className="h-24 w-24 object-cover rounded-full shadow-lg ring-4 ring-white dark:ring-gray-800" />
             </div>
             <Card className="w-full max-w-md">
                 <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">

@@ -20,6 +20,25 @@ export const geocodeAddress = async (address: string): Promise<GeocodedLocation 
     }
 };
 
+export const reverseGeocodeAddress = async (lat: number, lon: number): Promise<string | null> => {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+    try {
+        const response = await fetch(url, { headers: { 'Accept-Language': 'en' } }); // Use English for consistent parsing if possible, or omit
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.address) {
+            const city = data.address.city || data.address.town || data.address.village || data.address.county;
+            const state = data.address.state;
+            if (city && state) return `${city}, ${state}`;
+            return data.display_name;
+        }
+        return null;
+    } catch (error) {
+        console.error('Failed to reverse geocode address:', error);
+        return null;
+    }
+};
+
 const VIEWBOX_RADIUS_KM = 10; // Search within a 10km radius
 
 export const findNearbyFacilities = async (query: string, lat: number, lon: number): Promise<HealthcareFacility[]> => {
