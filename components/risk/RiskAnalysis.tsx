@@ -74,8 +74,51 @@ const GaugeChart = ({ value, name }: { value: number, name: string }) => {
   );
 };
 
+const taOptionsMap: Record<string, string> = {
+    '0-1 days': '0-1 நாட்கள்',
+    '2-3 days': '2-3 நாட்கள்',
+    '4-5 days': '4-5 நாட்கள்',
+    '6-7 days': '6-7 நாட்கள்',
+    'High in processed foods': 'பதப்படுத்தப்பட்ட உணவுகள் அதிகம்',
+    'Balanced': 'சமச்சீர்',
+    'Mostly whole foods': 'பெரும்பாலும் முழு உணவுகள்',
+    'Very healthy/plant-based': 'மிகவும் ஆரோக்கியமான / தாவர அடிப்படையிலான',
+    'Yes, daily': 'ஆம், தினமும்',
+    'Yes, occasionally': 'ஆம், எப்போதாவது',
+    'Former smoker': 'முன்பு புகைப்பிடித்தவர்',
+    'Never': 'ஒருபோதும் இல்லை',
+    'Rarely/Never': 'அரிதாக / ஒருபோதும் இல்லை',
+    'Daily': 'தினசரி',
+    'Several times a week': 'வாரத்தில் பல முறை',
+    'Once a week': 'வாரத்திற்கு ஒருமுறை',
+    'High': 'அதிகம்',
+    'Moderate': 'மிதமான',
+    'Low': 'குறைவு',
+    'Very Low': 'மிகக் குறைவு',
+    '< 6 hours': '< 6 மணி நேரம்',
+    '6-7 hours': '6-7 மணி நேரம்',
+    '7-8 hours': '7-8 மணி நேரம்',
+    '> 8 hours': '> 8 மணி நேரம்',
+    'Yes, immediate family': 'ஆம், நெருங்கிய குடும்பம்',
+    'Yes, extended family': 'ஆம், விரிவான குடும்பம்',
+    'No': 'இல்லை',
+    "I don't know": "எனக்கு தெரியாது",
+    'Underweight': 'குறைந்த எடை',
+    'Healthy weight': 'ஆரோக்கியமான எடை',
+    'Overweight': 'அதிக எடை',
+    'Obese': 'பருமன்',
+    'Normal': 'சாதாரண',
+    'Elevated/High': 'உயர்ந்த / அதிக',
+    'Yes': 'ஆம்',
+    'Not Applicable': 'பொருந்தாது',
+    'Irregular': 'ஒழுங்கற்ற',
+    'Menopausal/Not Applicable': 'மாதவிடாய் நிற்றல் / பொருந்தாது',
+    'Unsure': 'உறுதியாக தெரியவில்லை',
+    'Yes, diagnosed': 'ஆம் ஆதிக்கம்',
+};
+
 const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile, navigate }) => {
-  const { t, getLanguageName } = useLanguage();
+  const { t, getLanguageName, language } = useLanguage();
   const [formData, setFormData] = useState({
     age: userProfile?.age || '',
     gender: userProfile?.gender || '',
@@ -235,7 +278,7 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile, navigate }) =>
   const renderQuestions = (questions: {id: string, text: string, options: string[]}[]) => {
       return questions.map((q) => (
         <div key={q.id} className="md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{q.text}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{language === 'ta' ? t(`risk.questions.${q.id}`) : q.text}</label>
             <div className="mt-2 flex flex-wrap gap-2">
                 {q.options.map((option) => (
                 <button
@@ -248,7 +291,7 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile, navigate }) =>
                         : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                 >
-                    {option}
+                    {language === 'ta' ? (taOptionsMap[option] || option) : option}
                 </button>
                 ))}
             </div>
@@ -258,21 +301,21 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile, navigate }) =>
 
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       <Card>
         <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 <div>
-                    <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
+                    <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.age')}</label>
                     <input type="number" name="age" id="age" value={formData.age} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
-                    <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Gender</label>
+                    <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.gender')}</label>
                     <select name="gender" id="gender" value={formData.gender} onChange={handleInputChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
+                        <option value="">{t('predictor.selectGender')}</option>
+                        <option value="Male">{t('profile.male')}</option>
+                        <option value="Female">{t('profile.female')}</option>
+                        <option value="Other">{t('profile.other')}</option>
                     </select>
                 </div>
 
@@ -284,7 +327,7 @@ const RiskAnalysis: React.FC<RiskAnalysisProps> = ({ userProfile, navigate }) =>
             </div>
             <div className="mt-8">
                 <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
-                Check My Lifestyle
+                {t('risk.analyze')}
                 </Button>
             </div>
             {error && <p className="text-red-500 text-sm text-center mt-4">{error}</p>}

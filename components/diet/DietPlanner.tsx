@@ -101,7 +101,7 @@ const DietPlanner: React.FC<DietPlannerProps> = ({ lifestyleData }) => {
   }, [formData, lifestyleData, getLanguageName]);
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-2xl mx-auto">
       {lifestyleData && (
         <Card className="mb-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-l-4 border-green-500">
           <p className="text-lg text-gray-800 dark:text-gray-100">
@@ -113,30 +113,30 @@ const DietPlanner: React.FC<DietPlannerProps> = ({ lifestyleData }) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="goal" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Primary Goal</label>
+              <label htmlFor="goal" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('diet.primaryGoal')}</label>
               <select name="goal" id="goal" value={formData.goal} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                <option>Weight Loss</option>
-                <option>Muscle Gain</option>
-                <option>Maintenance</option>
-                <option>Diabetes Management</option>
-                <option>Heart Health</option>
+                <option value="Weight Loss">{t('diet.weightLoss')}</option>
+                <option value="Muscle Gain">Muscle Gain</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Diabetes Management">Diabetes Management</option>
+                <option value="Heart Health">Heart Health</option>
               </select>
             </div>
             <div>
-              <label htmlFor="calories" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Target Daily Calories</label>
+              <label htmlFor="calories" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('diet.targetCalories')}</label>
               <input type="number" name="calories" id="calories" value={formData.calories} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
             </div>
           </div>
           <div>
-            <label htmlFor="preferences" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Dietary Preferences (e.g., vegetarian, low-carb)</label>
+            <label htmlFor="preferences" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('diet.dietaryPreferences')}</label>
             <input type="text" name="preferences" id="preferences" value={formData.preferences} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
           </div>
           <div>
-            <label htmlFor="allergies" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Allergies or Foods to Avoid</label>
+            <label htmlFor="allergies" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('diet.allergiesToAvoid')}</label>
             <input type="text" name="allergies" id="allergies" value={formData.allergies} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
           </div>
           <div>
-            <Button type="submit" isLoading={loading} disabled={loading} className="w-full">Generate Diet Plan</Button>
+            <Button type="submit" isLoading={loading} disabled={loading} className="w-full">{t('diet.generatePlan')}</Button>
           </div>
           {error && <p className="text-red-500 text-sm">{error}</p>}
         </form>

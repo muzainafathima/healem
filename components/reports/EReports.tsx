@@ -89,7 +89,7 @@ const EReports: React.FC = () => {
     }, [file]);
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-2xl mx-auto">
             <Card>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>

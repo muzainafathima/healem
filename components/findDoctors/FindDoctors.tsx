@@ -102,7 +102,7 @@ const BookingModal: React.FC<{
   );
 };
 
-const FindDoctors: React.FC = () => {
+const FindDoctors: React.FC<{ user?: AppUser }> = ({ user }) => {
   const { t } = useLanguage();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -325,15 +325,15 @@ const FindDoctors: React.FC = () => {
   const handleBook = async (doctor: Doctor, date: string, slot: string) => {
     setBookingStatus('booking');
     try {
-      const currentUser: AppUser = {
+      const currentUser: AppUser = user || {
         uid: 'demo-user',
         email: 'user@example.com'
       };
 
       await bookAppointment(currentUser, doctor, date, slot);
+      setSelectedDoctor(null); // Close both modal and loading box simultaneously
       setBookingStatus('success');
       setTimeout(() => {
-        setSelectedDoctor(null);
         setBookingStatus('idle');
       }, 2000);
     } catch (error) {
@@ -365,7 +365,7 @@ const FindDoctors: React.FC = () => {
   }, [facilities, location]);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <Card>
         <h1 className="text-3xl font-bold mb-2">{t('findDoctors.title')}</h1>
         
@@ -387,36 +387,38 @@ const FindDoctors: React.FC = () => {
           </Button>
         </div>
 
-        {/* Location Search - Common for both views */}
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" style={{width: '20px', height: '20px'}}>
-                <SearchIcon />
+        {/* Location Search - Only for map view */}
+        {activeView === 'map' && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" style={{width: '20px', height: '20px'}}>
+                  <SearchIcon />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchLocation()}
+                  placeholder={t('locations.searchPlaceholder')}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchLocation()}
-                placeholder={t('locations.searchPlaceholder')}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <Button onClick={handleSearchLocation} disabled={isLocating}>
+                {isLocating ? t('consult.searching') : t('common.search')}
+              </Button>
+              <Button onClick={handleGetCurrentLocation} disabled={isLocating} variant="secondary">
+                <div style={{width: '20px', height: '20px'}}>
+                  <LocationMarkerIcon />
+                </div>
+              </Button>
             </div>
-            <Button onClick={handleSearchLocation} disabled={isLocating}>
-              {isLocating ? <Spinner message="" /> : t('common.search')}
-            </Button>
-            <Button onClick={handleGetCurrentLocation} disabled={isLocating} variant="secondary">
-              <div style={{width: '20px', height: '20px'}}>
-                <LocationMarkerIcon />
-              </div>
-            </Button>
-          </div>
 
-          {locationError && (
-            <div className="text-red-600 dark:text-red-400 text-sm">{locationError}</div>
-          )}
-        </div>
+            {locationError && (
+              <div className="text-red-600 dark:text-red-400 text-sm">{locationError}</div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Booking View */}
@@ -474,7 +476,7 @@ const FindDoctors: React.FC = () => {
 
             <div className="flex items-end">
               <Button onClick={searchDoctors} disabled={isSearching} className="w-full">
-                {isSearching ? <Spinner message="" /> : t('consult.search')}
+                {isSearching ? t('consult.searching') : t('consult.search')}
               </Button>
             </div>
           </div>
@@ -602,8 +604,10 @@ const FindDoctors: React.FC = () => {
 
       {/* Booking Status Messages */}
       {bookingStatus === 'booking' && (
-        <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg">
-          {t('consult.booking')}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50">
+          <Card className="mx-4 max-w-sm w-full bg-white dark:bg-gray-800 shadow-2xl">
+            <Spinner message={t('consult.booking')} />
+          </Card>
         </div>
       )}
 

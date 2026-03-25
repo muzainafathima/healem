@@ -41,11 +41,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, 
       ></div>
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-800 w-64 shadow-xl z-40 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-800 w-64 border-r border-gray-200 dark:border-gray-700 shadow-2xl lg:shadow-none z-40 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } flex flex-col overflow-y-auto`}
+        } flex flex-col overflow-y-auto custom-scrollbar`}
       >
-        <div className="p-6 flex items-center justify-center border-b border-gray-200 dark:border-gray-700">
+        <div className="h-[57px] px-6 flex items-center justify-center border-b border-gray-200 dark:border-gray-700 shrink-0">
           <HealthGuardLogo />
           <h1 className="text-2xl font-bold ml-3 text-gray-800 dark:text-white">HEAL'EM</h1>
         </div>

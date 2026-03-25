@@ -173,7 +173,7 @@ const DiseasePredictor: React.FC<DiseasePredictorProps> = ({ navigate, userProfi
   };
   
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-2xl mx-auto">
       <Card>
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

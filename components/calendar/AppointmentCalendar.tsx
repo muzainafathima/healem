@@ -7,7 +7,7 @@ import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 
 const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -65,7 +65,7 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-3xl mx-auto">
             {successMessage && (
                 <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 border border-green-400 text-green-700" role="alert">
                     <strong className="font-bold">{t('calendar.success')} </strong>
@@ -86,12 +86,12 @@ const AppointmentCalendar: React.FC<{ user: AppUser }> = ({ user }) => {
                                     <div className="flex flex-col sm:flex-row justify-between">
                                         <div className="flex-1">
                                             <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">{app.doctorName}</p>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">{app.doctorSpecialty}</p>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">{language === 'ta' && app.doctorSpecialty === 'General Practice' ? 'பொது மருத்துவம்' : app.doctorSpecialty}</p>
                                             <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">{app.doctorAddress}</p>
                                         </div>
                                         <div className="mt-3 sm:mt-0 sm:text-right flex flex-col justify-between">
                                             <div>
-                                                <p className="font-bold text-gray-800 dark:text-gray-200">{displayDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                                <p className="font-bold text-gray-800 dark:text-gray-200">{displayDate.toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                                 <p className="font-semibold text-lg text-gray-700 dark:text-gray-300">{app.slot}</p>
                                             </div>
                                             <div className="mt-3 sm:mt-2">

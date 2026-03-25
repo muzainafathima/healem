@@ -20,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, pageTitle, isDarkMode, t
 
   return (
     <>
-    <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center sticky top-0 z-50">
+    <header className="h-[57px] bg-gray-100/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700/50 px-6 flex justify-between items-center sticky top-0 z-30 shrink-0">
       <div className="flex items-center">
         <button onClick={toggleSidebar} className="lg:hidden mr-4 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors" aria-label="Toggle menu">
           <MenuIcon />

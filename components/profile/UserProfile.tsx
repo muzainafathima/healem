@@ -65,7 +65,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate 
     };
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-3xl mx-auto">
             <Card>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Left Column: Photo and Personal Details */}
@@ -85,7 +85,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate 
                             </label>
                         </div>
                          <div className="w-full space-y-4 text-sm">
-                            <input type="text" name="name" value={profile.name} onChange={handleChange} placeholder="Your Name" className="w-full text-center font-semibold text-lg bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500" />
+                            <input type="text" name="name" value={profile.name} onChange={handleChange} placeholder={t('profile.info')} className="w-full text-center font-semibold text-lg bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500" />
                         </div>
                     </div>
 
@@ -94,46 +94,46 @@ const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate 
                          <h2 className="text-2xl font-bold text-gray-800 dark:text-white hidden md:block">{t('profile.myHealthProfile')}</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                              <div>
-                                <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
+                                <label htmlFor="age" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('predictor.age')}</label>
                                 <input type="number" name="age" id="age" value={profile.age} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                             </div>
                             <div>
-                                <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Gender</label>
+                                <label htmlFor="gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.gender')}</label>
                                 <select name="gender" id="gender" value={profile.gender} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                                    <option value="">Select...</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
+                                    <option value="">{t('predictor.selectGender')}</option>
+                                    <option value="Male">{t('profile.male')}</option>
+                                    <option value="Female">{t('profile.female')}</option>
+                                    <option value="Other">{t('profile.other')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label htmlFor="weight" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Weight (kg)</label>
+                                <label htmlFor="weight" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.weight')}</label>
                                 <input type="number" name="weight" id="weight" value={profile.weight} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                             </div>
                             <div>
-                                <label htmlFor="height" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Height (cm)</label>
+                                <label htmlFor="height" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.height')}</label>
                                 <input type="number" name="height" id="height" value={profile.height} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" />
                             </div>
                         </div>
                         <div>
-                            <label htmlFor="conditions" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pre-existing Conditions</label>
-                            <textarea id="conditions" name="conditions" rows={4} value={profile.conditions} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="e.g., Asthma, Type 2 Diabetes..." />
+                            <label htmlFor="conditions" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.preExisting')}</label>
+                            <textarea id="conditions" name="conditions" rows={4} value={profile.conditions} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder={t('profile.preExistingPlaceholder')} />
                         </div>
                         <div>
-                            <label htmlFor="surgeries" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Past Surgeries</label>
-                            <textarea id="surgeries" name="surgeries" rows={4} value={profile.surgeries} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="e.g., Appendectomy (2015)..." />
+                            <label htmlFor="surgeries" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.pastSurgeries')}</label>
+                            <textarea id="surgeries" name="surgeries" rows={4} value={profile.surgeries} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder={t('profile.pastSurgeriesPlaceholder')} />
                         </div>
                          <div className="flex items-center justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             {saveMessage && <p className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>{saveMessage}</p>}
-                            <Button onClick={handleSave} isLoading={isSaving} disabled={isSaving}>Save Changes</Button>
+                            <Button onClick={handleSave} isLoading={isSaving} disabled={isSaving}>{t('profile.save')}</Button>
                         </div>
                     </div>
                 </div>
             </Card>
             <Card className="mt-6">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Privacy Note</h3>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{t('profile.privacyNote')}</h3>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Your profile information is stored securely on your device's local storage and is not uploaded to our servers. This ensures your data remains private and under your control. Clearing your browser's cache may remove this data.
+                    {t('profile.privacyText')}
                 </p>
             </Card>
         </div>

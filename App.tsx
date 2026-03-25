@@ -114,7 +114,7 @@ const AppContent: React.FC = () => {
       case 'diet':
         return <DietPlanner lifestyleData={pageProps.diet?.lifestyleData} />;
       case 'findDoctors':
-        return <FindDoctors />;
+        return <FindDoctors user={user} />;
       case 'calendar':
         return <AppointmentCalendar user={user} />;
       case 'profile':
@@ -148,9 +148,9 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen flex relative overflow-x-hidden text-gray-800 dark:text-gray-200">
+    <div className="bg-gray-100 dark:bg-gray-900 h-screen flex relative overflow-hidden text-gray-800 dark:text-gray-200">
       <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col min-w-0 w-full lg:w-auto">
+      <div className="flex-1 flex flex-col min-w-0 w-full lg:w-auto overflow-hidden">
         {currentPage !== 'dashboard' && (
           <Header 
             toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 
@@ -162,7 +162,7 @@ const AppContent: React.FC = () => {
             userProfile={userProfile}
           />
         )}
-        <main className={`flex-1 ${currentPage !== 'dashboard' ? 'p-4 sm:p-6 lg:p-8' : ''} overflow-y-auto`}>
+        <main className={`flex-1 ${currentPage !== 'dashboard' ? 'p-4 sm:p-6 lg:p-8' : ''} overflow-y-auto custom-scrollbar`}>
           {renderPage()}
         </main>
       </div>
