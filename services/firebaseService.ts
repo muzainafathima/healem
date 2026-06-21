@@ -17,20 +17,26 @@ import {
   where,
   getDocs,
   doc,
+  setDoc,
+  getDoc,
   deleteDoc,
   Timestamp
 } from 'firebase/firestore';
-import type { Doctor, Appointment, AppUser } from '../types';
+import { deleteUser } from 'firebase/auth';
+import type { Doctor, Appointment, AppUser, UserProfileData } from '../types';
 
+// Firebase web config is read from environment variables (set VITE_FIREBASE_*
+// in Vercel). Fallback values are kept so existing deployments keep working,
+// but production should rely on the env vars and rotate the keys below.
 const firebaseConfig = {
-  apiKey: "AIzaSyBZjafdO0LQvc7Ry4JUi_QomHdniFAzYGo",
-  authDomain: "iwc-health-pro.firebaseapp.com",
-  databaseURL: "https://iwc-health-pro-default-rtdb.firebaseio.com",
-  projectId: "iwc-health-pro",
-  storageBucket: "iwc-health-pro.firebasestorage.app",
-  messagingSenderId: "905313749463",
-  appId: "1:905313749463:web:286b401b40e3cd5bbe2392",
-  measurementId: "G-F95R7BYC0V"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? "AIzaSyBZjafdO0LQvc7Ry4JUi_QomHdniFAzYGo",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "iwc-health-pro.firebaseapp.com",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL ?? "https://iwc-health-pro-default-rtdb.firebaseio.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "iwc-health-pro",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? "iwc-health-pro.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "905313749463",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? "1:905313749463:web:286b401b40e3cd5bbe2392",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? "G-F95R7BYC0V"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -146,6 +152,57 @@ export const cancelAppointment = async (appointmentId: string): Promise<boolean>
         console.error("Error canceling appointment:", error);
         console.error("Error code:", error.code);
         console.error("Error message:", error.message);
+        return false;
+    }
+};
+
+// --- USER PROFILE (server-side, replaces localStorage-only storage) ---
+// Storing the health profile in Firestore (keyed by uid) means it survives
+// device changes, can be audited, and — importantly for DPDP — can be
+// fully exported and deleted on request.
+
+export const saveUserProfile = async (user: AppUser, profile: UserProfileData): Promise<boolean> => {
+    try {
+        await setDoc(doc(db, "profiles", user.uid), { ...profile, updatedAt: Timestamp.now() });
+        return true;
+    } catch (error) {
+        console.error("Error saving user profile:", error);
+        return false;
+    }
+};
+
+export const getUserProfile = async (user: AppUser): Promise<UserProfileData | null> => {
+    try {
+        const snap = await getDoc(doc(db, "profiles", user.uid));
+        return snap.exists() ? (snap.data() as UserProfileData) : null;
+    } catch (error) {
+        console.error("Error fetching user profile:", error);
+        return null;
+    }
+};
+
+// --- DPDP COMPLIANCE: Right to erasure ---
+// Deletes all of a user's data (appointments + profile) and the auth account.
+export const deleteAllUserData = async (user: AppUser): Promise<boolean> => {
+    try {
+        const apptQuery = query(collection(db, "appointments"), where("userId", "==", user.uid));
+        const appts = await getDocs(apptQuery);
+        await Promise.all(appts.docs.map((d) => deleteDoc(d.ref)));
+
+        await deleteDoc(doc(db, "profiles", user.uid)).catch(() => {});
+
+        // Remove any locally cached data as well.
+        try {
+            localStorage.removeItem('userProfile');
+        } catch { /* ignore */ }
+
+        // Finally delete the Firebase Auth account (requires a recent login).
+        if (auth.currentUser) {
+            await deleteUser(auth.currentUser);
+        }
+        return true;
+    } catch (error) {
+        console.error("Error deleting user data:", error);
         return false;
     }
 };

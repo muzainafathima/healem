@@ -19,13 +19,29 @@ const initialProfileState: UserProfileData = {
 interface UserProfileProps {
     userProfile: UserProfileData | null;
     onProfileUpdate: (profile: UserProfileData) => void;
+    onDeleteAccount?: () => Promise<boolean>;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate, onDeleteAccount }) => {
     const { t } = useLanguage();
     const [profile, setProfile] = useState<UserProfileData>(initialProfileState);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async () => {
+        if (!onDeleteAccount) return;
+        const confirmed = window.confirm(
+            'This will permanently delete your account and all your health data (profile and appointments). This cannot be undone. Continue?'
+        );
+        if (!confirmed) return;
+        setIsDeleting(true);
+        const ok = await onDeleteAccount();
+        if (!ok) {
+            setIsDeleting(false);
+            window.alert('Could not delete your account. For security, you may need to sign in again and retry.');
+        }
+    };
 
     useEffect(() => {
         if (userProfile) {
@@ -135,7 +151,30 @@ const UserProfile: React.FC<UserProfileProps> = ({ userProfile, onProfileUpdate 
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                     {t('profile.privacyText')}
                 </p>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">Privacy Policy</a>
+                    {' · '}
+                    <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">Terms of Service</a>
+                </p>
             </Card>
+            {onDeleteAccount && (
+                <Card className="mt-6 border border-red-200 dark:border-red-900/50">
+                    <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Delete my account &amp; data</h3>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        Permanently erase your profile, appointments and account. This is your
+                        right to erasure under the DPDP Act and cannot be undone.
+                    </p>
+                    <div className="mt-4 flex justify-end">
+                        <button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
+                        >
+                            {isDeleting ? 'Deleting…' : 'Delete everything'}
+                        </button>
+                    </div>
+                </Card>
+            )}
         </div>
     );
 };

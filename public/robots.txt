@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /privacy.html
+Allow: /terms.html
+
+# Block the app itself from being indexed (it's behind auth, content-free to crawlers)
+Disallow: /app
+Disallow: /app/
+
+Sitemap: https://healem.vercel.app/sitemap.xml
