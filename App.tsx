@@ -15,7 +15,7 @@ import Spinner from './components/ui/Spinner';
 import Chatbot from './components/chat/Chatbot';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import useDarkMode from './hooks/useDarkMode';
-import { onAuthChange, signOutUser } from './services/firebaseService';
+import { onAuthChange, signOutUser, getUserProfile, saveUserProfile, deleteAllUserData } from './services/firebaseService';
 import type { AppUser, UserProfileData } from './types';
 import { initializeApp as initCapacitor } from './utils/capacitor';
 
@@ -108,19 +108,29 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthChange((firebaseUser) => {
       if (firebaseUser) {
-        setUser({
+        const appUser: AppUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
-        });
-        // Load user profile from localStorage
+        };
+        setUser(appUser);
+        // Load profile from Firestore (authoritative); fall back to any locally
+        // cached copy so the UI still populates if the network is slow/offline.
         try {
           const savedProfile = localStorage.getItem('userProfile');
           if (savedProfile) {
             setUserProfile(JSON.parse(savedProfile));
           }
         } catch (error) {
-            console.error("Failed to load user profile from localStorage", error);
+            console.error("Failed to load cached user profile", error);
         }
+        getUserProfile(appUser)
+          .then((remoteProfile) => {
+            if (remoteProfile) {
+              setUserProfile(remoteProfile);
+              try { localStorage.setItem('userProfile', JSON.stringify(remoteProfile)); } catch { /* ignore */ }
+            }
+          })
+          .catch((error) => console.error("Failed to load remote profile", error));
       } else {
         setUser(null);
         setUserProfile(null);
@@ -145,8 +155,21 @@ const AppContent: React.FC = () => {
     try {
         localStorage.setItem('userProfile', JSON.stringify(newProfile));
     } catch (error) {
-        console.error("Failed to save user profile to localStorage", error);
+        console.error("Failed to cache user profile locally", error);
     }
+    // Persist to Firestore so the profile survives device changes and is
+    // available for export/erasure (DPDP).
+    if (user) {
+        saveUserProfile(user, newProfile).catch((error) =>
+            console.error("Failed to save profile to Firestore", error));
+    }
+  };
+
+  const handleDeleteAccount = async (): Promise<boolean> => {
+    if (!user) return false;
+    const success = await deleteAllUserData(user);
+    // onAuthChange will clear state once the auth account is removed.
+    return success;
   };
 
   const renderPage = () => {
@@ -167,7 +190,7 @@ const AppContent: React.FC = () => {
       case 'calendar':
         return <AppointmentCalendar user={user} />;
       case 'profile':
-        return <UserProfile userProfile={userProfile} onProfileUpdate={handleProfileUpdate} />;
+        return <UserProfile userProfile={userProfile} onProfileUpdate={handleProfileUpdate} onDeleteAccount={handleDeleteAccount} />;
       default:
         return <Dashboard navigate={handleNavigate} toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />;
     }

@@ -9,10 +9,17 @@ const Auth: React.FC = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [consent, setConsent] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        if (!isLogin && !consent) {
+            setError('Please agree to the Privacy Policy and consent to processing of your health data to create an account.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -95,6 +102,27 @@ const Auth: React.FC = () => {
                             className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700"
                         />
                     </div>
+                    {!isLogin && (
+                        <div className="flex items-start gap-2">
+                            <input
+                                id="consent"
+                                type="checkbox"
+                                checked={consent}
+                                onChange={(e) => setConsent(e.target.checked)}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <label htmlFor="consent" className="text-xs text-gray-600 dark:text-gray-400">
+                                I am 18 or older and I consent to HEAL'EM processing my health
+                                information to provide AI-based insights. I have read the{' '}
+                                <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
+                                    Privacy Policy
+                                </a>{' '}and{' '}
+                                <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
+                                    Terms of Service
+                                </a>.
+                            </label>
+                        </div>
+                    )}
                      {error && <p className="text-sm text-red-500">{error}</p>}
                     <div>
                         <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
