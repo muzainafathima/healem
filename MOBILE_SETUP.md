@@ -214,7 +214,7 @@ cd android
 
 Create a `.env` file in the root directory:
 ```
-VITE_GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_api_key_here
 VITE_FIREBASE_API_KEY=your_firebase_key
 VITE_FIREBASE_AUTH_DOMAIN=your_domain
 # Add other Firebase config

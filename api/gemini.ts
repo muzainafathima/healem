@@ -1,27 +1,59 @@
 // Server-side Gemini proxy (Vercel Serverless Function).
 //
-// SECURITY: The Gemini API key MUST live only on the server. Set it in the
-// Vercel project as `GEMINI_API_KEY` (NOT prefixed with VITE_, so it is never
-// bundled into the client). This endpoint is the single entry point the
-// browser uses for every AI feature, which also gives us one place to add
-// rate limiting, logging and abuse protection later.
+// SECURITY: The Gemini API key MUST live only on the server. Prefer setting it
+// in Vercel as `GEMINI_API_KEY`; `VITE_GEMINI_API_KEY` is accepted as a
+// fallback for older setups, but the unprefixed name is the recommended one.
+// This endpoint is the single entry point the browser uses for every AI
+// feature, which also gives us one place to add rate limiting, logging and
+// abuse protection later.
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const API_KEY: string | undefined = process.env.GEMINI_API_KEY;
+const API_KEY: string | undefined = process.env.GEMINI_API_KEY ?? process.env.VITE_GEMINI_API_KEY;
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 const ai = new GoogleGenAI({ apiKey: API_KEY ?? "" });
 
+const parseJsonResponse = (text: string) => {
+  const trimmed = text.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const candidate = fencedMatch?.[1]?.trim() ?? trimmed;
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+
+    if (start >= 0 && end > start) {
+      return JSON.parse(candidate.slice(start, end + 1));
+    }
+
+    throw new Error("Gemini response was not valid JSON.");
+  }
+};
+
 const generate = async (prompt: any, responseSchema: any) => {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema,
-    },
-  });
-  return JSON.parse(response.text.trim());
+  let lastError: unknown;
+
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema,
+        },
+      });
+      return parseJsonResponse(response.text || "");
+    } catch (error) {
+      lastError = error;
+      console.error(`Gemini model ${model} failed:`, error?.message || error);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("All Gemini model attempts failed.");
 };
 
 const mealSchema = {
@@ -136,7 +168,7 @@ export default async function handler(req: any, res: any) {
   }
   if (!API_KEY) {
     console.error("GEMINI_API_KEY environment variable not set on the server.");
-    return res.status(500).json({ error: "AI service is not configured." });
+    return res.status(500).json({ error: "AI service is not configured.", code: "MISSING_API_KEY" });
   }
 
   try {
@@ -234,14 +266,19 @@ export default async function handler(req: any, res: any) {
           model: "gemini-2.5-flash",
           contents: prompt,
         });
-        return res.status(200).json({ text: response.text.trim() });
+        return res.status(200).json({ text: (response.text || "").trim() });
       }
 
       default:
         return res.status(400).json({ error: "Unknown action" });
     }
   } catch (error: any) {
-    console.error("Gemini proxy error:", error?.message || error);
-    return res.status(502).json({ error: "AI request failed." });
+    const message = error?.message || String(error || "Unknown error");
+    console.error("Gemini proxy error:", message);
+    return res.status(502).json({
+      error: "AI request failed.",
+      code: "GEMINI_REQUEST_FAILED",
+      message,
+    });
   }
 }
