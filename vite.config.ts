@@ -19,6 +19,13 @@ export default defineConfig(({ mode }) => {
         outDir: 'dist',
         assetsDir: 'assets',
         rollupOptions: {
+          // Two entry points: the public landing page at "/" and the React
+          // app at "/app". Both become real files in dist (index.html and
+          // app/index.html), so no fragile rewrite is needed for "/".
+          input: {
+            main: path.resolve(__dirname, 'index.html'),
+            app: path.resolve(__dirname, 'app/index.html'),
+          },
           output: {
             manualChunks: undefined
           }
